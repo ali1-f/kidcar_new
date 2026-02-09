@@ -18,6 +18,10 @@ void steerStart(int direction, uint16_t durationMs) {
     steerStop();
     return;
   }
+  if (direction == 0) {
+    steerStop();
+    return;
+  }
 
   if (direction > 0) {
     digitalWrite(PIN_L298_IN1, HIGH);
