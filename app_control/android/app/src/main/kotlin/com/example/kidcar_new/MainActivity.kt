@@ -27,7 +27,10 @@ class MainActivity : FlutterActivity() {
             acquire()
         }
         val power = applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kidcar_wake").apply {
+        @Suppress("DEPRECATION")
+        val flags = PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP
+        @Suppress("DEPRECATION")
+        wakeLock = power.newWakeLock(flags, "kidcar_wake").apply {
             setReferenceCounted(false)
             acquire()
         }
