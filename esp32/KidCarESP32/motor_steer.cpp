@@ -23,7 +23,13 @@ void steerStart(int direction, uint16_t durationMs) {
     return;
   }
 
-  if (direction > 0) {
+  const int dir = (direction > 0) ? 1 : (direction < 0 ? -1 : 0);
+  if (dir == 0) {
+    steerStop();
+    return;
+  }
+
+  if (dir > 0) {
     digitalWrite(PIN_L298_IN1, HIGH);
     digitalWrite(PIN_L298_IN2, LOW);
   } else {
