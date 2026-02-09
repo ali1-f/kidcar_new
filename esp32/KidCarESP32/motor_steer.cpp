@@ -19,10 +19,6 @@ void steerStart(int speed, uint16_t durationMs) {
     return;
   }
 
-  if (speed > STEER_MAX_PWM_PCT) speed = STEER_MAX_PWM_PCT;
-  if (speed < -STEER_MAX_PWM_PCT) speed = -STEER_MAX_PWM_PCT;
-  int duty = toDuty(speed);
-
   if (speed > 0) {
     digitalWrite(PIN_L298_IN1, HIGH);
     digitalWrite(PIN_L298_IN2, LOW);
@@ -31,13 +27,11 @@ void steerStart(int speed, uint16_t durationMs) {
     digitalWrite(PIN_L298_IN2, HIGH);
   }
 
-  ledcWriteChannel(CH_L298, duty);
   steerEndAt = millis() + durationMs;
   steerActive = true;
 }
 
 void steerStop() {
-  ledcWriteChannel(CH_L298, 0);
   digitalWrite(PIN_L298_IN1, LOW);
   digitalWrite(PIN_L298_IN2, LOW);
   steerActive = false;

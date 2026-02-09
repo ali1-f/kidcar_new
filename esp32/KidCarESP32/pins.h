@@ -12,8 +12,8 @@ static const int PIN_BTS_LEN  = 18; // Enable
 // Main power relay (enable)
 static const int PIN_RELAY_EN = 16; // HIGH = enable
 
-// L298N (steering motor)
-static const int PIN_L298_ENA = 21; // PWM
+// L298N (steering motor) - ENA is jumpered HIGH (no PWM on ENA)
+static const int PIN_L298_ENA = 21; // Enable (kept HIGH)
 static const int PIN_L298_IN1 = 38; // Dir
 static const int PIN_L298_IN2 = 39; // Dir
 

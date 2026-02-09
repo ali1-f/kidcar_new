@@ -13,7 +13,8 @@ static const int PWM_RES  = 10;    // 0..1023
 
 // Steering safety
 static const uint16_t STEER_MAX_MS = 5000; // hard limit for steering motor run time
-static const uint8_t STEER_MAX_PWM_PCT = 60; // safe max PWM for steering
+// PWM for steering is disabled (ENA jumpered). Only time limit applies.
+static const uint8_t STEER_MAX_PWM_PCT = 60; // unused when PWM disabled
 
 // Rear motor soft-start
 static const uint8_t REAR_SOFTSTART_MIN_PCT = 10; // safe start percent
