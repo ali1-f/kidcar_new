@@ -12,14 +12,14 @@ static int toDuty(int pct) {
   return map(pct, 0, 100, 0, maxDuty);
 }
 
-void steerStart(int speed, uint16_t durationMs) {
+void steerStart(int direction, uint16_t durationMs) {
   if (STEER_MAX_MS > 0 && durationMs > STEER_MAX_MS) durationMs = STEER_MAX_MS;
   if (durationMs == 0) {
     steerStop();
     return;
   }
 
-  if (speed > 0) {
+  if (direction > 0) {
     digitalWrite(PIN_L298_IN1, HIGH);
     digitalWrite(PIN_L298_IN2, LOW);
   } else {
