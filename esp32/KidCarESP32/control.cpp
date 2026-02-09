@@ -1,6 +1,7 @@
 #include "control.h"
 #include "motor_rear.h"
 #include "motor_steer.h"
+#include "pins.h"
 #include "config.h"
 #include <Arduino.h>
 
@@ -13,6 +14,9 @@ static uint32_t lastAppMs = 0;
 static bool appConnected = false;
 static uint32_t lastBlink = 0;
 static bool blinkOn = false;
+static bool relayOn = false;
+static uint32_t relayEnabledAt = 0;
+static const uint32_t RELAY_DELAY_MS = 100;
 
 static const uint8_t colors[][3] = {
   {255, 0, 0},   // red
@@ -34,17 +38,48 @@ static void setRgb(uint8_t idx) {
   rgbLedWrite(RGB_PIN, r, g, b);
 }
 
+static void setRelay(bool enable) {
+  if (enable == relayOn) return;
+  relayOn = enable;
+  digitalWrite(PIN_RELAY_EN, enable ? HIGH : LOW);
+  if (enable) {
+    relayEnabledAt = millis();
+  }
+}
+
 void controlInit() {
   rearSetSpeed(0);
   steerStop();
   setRgb(colorIndex);
   lastAppMs = millis();
+  setRelay(false);
 }
 
 void controlApply(const ControlCommand& cmd) {
   lastCmd = cmd;
-  rearSetSpeed(cmd.throttle);
-  steerStart(cmd.steer, cmd.steerMs);
+  const uint32_t now = millis();
+  const bool wantMotion = (cmd.throttle != 0) || (cmd.steer != 0);
+
+  if (!appConnected) {
+    setRelay(false);
+    rearSetSpeed(0);
+    steerStop();
+  } else if (wantMotion) {
+    if (!relayOn) {
+      setRelay(true);
+    }
+    if (relayOn && (now - relayEnabledAt) >= RELAY_DELAY_MS) {
+      rearSetSpeed(cmd.throttle);
+      steerStart(cmd.steer, cmd.steerMs);
+    } else {
+      rearSetSpeed(0);
+      steerStop();
+    }
+  } else {
+    rearSetSpeed(0);
+    steerStop();
+    setRelay(false);
+  }
 
   // brightness from speed (0..100) -> 0..255
   if (cmd.speed >= 0 && cmd.speed <= 100) {
@@ -59,7 +94,6 @@ void controlApply(const ControlCommand& cmd) {
   if (stepInput == 0 && cmd.steer > 0) stepInput = 1;
   if (stepInput == 0 && cmd.steer < 0) stepInput = -1;
 
-  const uint32_t now = millis();
   if (stepInput != 0 && stepInput != lastStepInput && (now - lastStepAt) > 150) {
     if (stepInput > 0) {
       colorIndex = (colorIndex + 1) % colorCount;
@@ -80,6 +114,9 @@ void controlLoop() {
   }
 
   if (!appConnected) {
+    setRelay(false);
+    rearSetSpeed(0);
+    steerStop();
     if (now - lastBlink >= 200) {
       lastBlink = now;
       blinkOn = !blinkOn;

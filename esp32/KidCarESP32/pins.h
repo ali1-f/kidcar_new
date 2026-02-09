@@ -4,15 +4,18 @@
 // Fill these with your actual ESP32-S3 pins
 
 // BTS7960 (rear motors)
-static const int PIN_BTS_RPWM = 2; // PWM
-static const int PIN_BTS_LPWM = 3; // PWM
-static const int PIN_BTS_REN  = 4; // Enable
-static const int PIN_BTS_LEN  = 5; // Enable
+static const int PIN_BTS_RPWM = 4;  // PWM
+static const int PIN_BTS_LPWM = 5;  // PWM
+static const int PIN_BTS_REN  = 17; // Enable
+static const int PIN_BTS_LEN  = 18; // Enable
+
+// Main power relay (enable)
+static const int PIN_RELAY_EN = 16; // HIGH = enable
 
 // L298N (steering motor)
-static const int PIN_L298_ENA = 6; // PWM
-static const int PIN_L298_IN1 = 7; // Dir
-static const int PIN_L298_IN2 = 8; // Dir
+static const int PIN_L298_ENA = 21; // PWM
+static const int PIN_L298_IN1 = 38; // Dir
+static const int PIN_L298_IN2 = 39; // Dir
 
 // LEDC channels
 static const int CH_BTS_R = 0;

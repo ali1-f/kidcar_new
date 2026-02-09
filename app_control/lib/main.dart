@@ -204,13 +204,17 @@ class UdpSender {
   void send(Map<String, dynamic> payload) {
     if (_socket == null || _address == null) return;
     final data = utf8.encode(jsonEncode(payload));
-    _socket!.send(data, _address!, port);
+    try {
+      _socket!.send(data, _address!, port);
+    } catch (_) {}
   }
 
   void sendTo(InternetAddress addr, Map<String, dynamic> payload) {
     if (_socket == null) return;
     final data = utf8.encode(jsonEncode(payload));
-    _socket!.send(data, addr, port);
+    try {
+      _socket!.send(data, addr, port);
+    } catch (_) {}
   }
 
   void dispose() {
@@ -240,7 +244,8 @@ class ControlScreen extends StatefulWidget {
 
 class _ControlScreenState extends State<ControlScreen> {
   static const MethodChannel _wifiChannel = MethodChannel('kidcar/wifi');
-  int _speed = 40; // 0..100
+  static const int _minSpeed = 10;
+  int _speed = _minSpeed; // 10..100
   int _throttle = 0; // -100..100
   int _steer = 0; // -100..100
   bool _parked = true;
@@ -301,7 +306,7 @@ class _ControlScreenState extends State<ControlScreen> {
   void _startConnectProbe() {
     _connectProbeTimer?.cancel();
     _sendTestUdp();
-    _connectProbeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _connectProbeTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (_connected) {
         _connectProbeTimer?.cancel();
         _connectProbeTimer = null;
@@ -374,6 +379,23 @@ class _ControlScreenState extends State<ControlScreen> {
     }
   }
 
+  Map<String, dynamic> _controlPayload({bool includePing = false}) {
+    final payload = {
+      'throttle': _throttle,
+      'steer': _steer,
+      'speed': _speed,
+      'park': _parked,
+      'battery': _battery,
+      'signal': _signal,
+    };
+    if (includePing) {
+      payload['ping'] = 1;
+      payload['test'] = 'kidcar';
+      payload['ts'] = DateTime.now().millisecondsSinceEpoch;
+    }
+    return payload;
+  }
+
   void _sendState() {
     final msSinceAck = DateTime.now().difference(_lastAck).inMilliseconds;
     final isConnected = msSinceAck < 3000;
@@ -394,20 +416,10 @@ class _ControlScreenState extends State<ControlScreen> {
       _udp.address = _espAddress!;
     }
 
-    if (!isConnected && msSinceAck > 5000) {
-      _udp.reset();
-    }
     _txCount += 1;
     _lastTx = DateTime.now();
     debugPrint('TX $_txCount @ ${_lastTx.toIso8601String()}');
-    final payload = {
-      'throttle': _throttle,
-      'steer': _steer,
-      'speed': _speed,
-      'park': _parked,
-      'battery': _battery,
-      'signal': _signal,
-    };
+    final payload = _controlPayload();
 
     if (_espAddress != null) {
       _udp.sendTo(_espAddress!, payload);
@@ -446,11 +458,7 @@ class _ControlScreenState extends State<ControlScreen> {
   }
 
   void _sendTestUdp() {
-    final payload = {
-      'ping': 1,
-      'test': 'kidcar',
-      'ts': DateTime.now().millisecondsSinceEpoch,
-    };
+    final payload = _controlPayload(includePing: true);
     _udp.sendTo(InternetAddress('192.168.4.1'), payload);
     _udp.sendTo(InternetAddress('192.168.4.255'), payload);
     _udp.sendTo(InternetAddress('255.255.255.255'), payload);
@@ -636,6 +644,7 @@ class _ControlScreenState extends State<ControlScreen> {
                       Expanded(
                         child: CenterPanel(
                           speed: _speed,
+                          minSpeed: _minSpeed,
                           onSpeedChanged: (v) {
                             setState(() => _speed = v);
                             _sendState();
@@ -1071,6 +1080,7 @@ class CenterPanel extends StatelessWidget {
   const CenterPanel({
     super.key,
     required this.speed,
+    required this.minSpeed,
     required this.onSpeedChanged,
     required this.parked,
     required this.parkBlink,
@@ -1081,6 +1091,7 @@ class CenterPanel extends StatelessWidget {
   });
 
   final int speed;
+  final int minSpeed;
   final ValueChanged<int> onSpeedChanged;
   final bool parked;
   final bool parkBlink;
@@ -1127,11 +1138,14 @@ class CenterPanel extends StatelessWidget {
               width: sliderWidth,
               child: Slider(
                 value: speed.toDouble(),
-                min: 0,
+                min: minSpeed.toDouble(),
                 max: 100,
-                divisions: 100,
+                divisions: 100 - minSpeed,
                 label: '$speed',
-                onChanged: (v) => onSpeedChanged(v.round()),
+                onChanged: (v) {
+                  final next = v.round() < minSpeed ? minSpeed : v.round();
+                  onSpeedChanged(next);
+                },
               ),
             ),
             Text(

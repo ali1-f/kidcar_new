@@ -19,6 +19,8 @@ void steerStart(int speed, uint16_t durationMs) {
     return;
   }
 
+  if (speed > STEER_MAX_PWM_PCT) speed = STEER_MAX_PWM_PCT;
+  if (speed < -STEER_MAX_PWM_PCT) speed = -STEER_MAX_PWM_PCT;
   int duty = toDuty(speed);
 
   if (speed > 0) {
