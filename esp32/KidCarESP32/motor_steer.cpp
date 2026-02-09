@@ -14,7 +14,12 @@ static int toDuty(int pct) {
 
 void steerStart(int speed, uint16_t durationMs) {
   if (STEER_MAX_MS > 0 && durationMs > STEER_MAX_MS) durationMs = STEER_MAX_MS;
-  if (speed == 0 || durationMs == 0) {
+  if (durationMs == 0) {
+    steerStop();
+    return;
+  }
+
+  if (speed == 0) {
     steerStop();
     return;
   }
