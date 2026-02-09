@@ -11,8 +11,8 @@
 static const int PWM_FREQ = 20000; // 20kHz
 static const int PWM_RES  = 10;    // 0..1023
 
-// Steering safety (0 = no time limit)
-static const uint16_t STEER_MAX_MS = 0; // hard limit for steering motor run time
+// Steering safety
+static const uint16_t STEER_MAX_MS = 5000; // hard limit for steering motor run time
 // PWM for steering is disabled (ENA jumpered). Only time limit applies.
 static const uint8_t STEER_MAX_PWM_PCT = 60; // unused when PWM disabled
 
