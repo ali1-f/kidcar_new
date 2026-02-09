@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -281,6 +282,7 @@ class _ControlScreenState extends State<ControlScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    WakelockPlus.enable();
     _udp.init();
     _startConnectProbe();
     _sendState();
@@ -299,6 +301,7 @@ class _ControlScreenState extends State<ControlScreen> {
     _txTimer?.cancel();
     _connectProbeTimer?.cancel();
     _heartbeatTimer?.cancel();
+    WakelockPlus.disable();
     _udp.dispose();
     super.dispose();
   }
