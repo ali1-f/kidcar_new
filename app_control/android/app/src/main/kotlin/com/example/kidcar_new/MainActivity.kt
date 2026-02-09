@@ -3,6 +3,7 @@ package com.example.kidcar_new
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.PowerManager
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -15,6 +16,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wifi.createMulticastLock("kidcar_multicast").apply {
             setReferenceCounted(false)
@@ -32,6 +34,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onPause() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         multicastLock?.let { lock ->
             if (lock.isHeld) {
                 lock.release()
