@@ -1,6 +1,8 @@
 package com.example.kidcar_new
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.PowerManager
 import android.view.WindowManager
@@ -70,6 +72,20 @@ class MainActivity : FlutterActivity() {
                         result.success(ssid)
                     } catch (e: Exception) {
                         result.success("")
+                    }
+                } else if (call.method == "requestIgnoreBatteryOptimizations") {
+                    try {
+                        val power = applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                        val pkg = applicationContext.packageName
+                        if (!power.isIgnoringBatteryOptimizations(pkg)) {
+                            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                            intent.data = Uri.parse("package:$pkg")
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
                     }
                 } else {
                     result.notImplemented()

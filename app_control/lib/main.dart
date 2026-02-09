@@ -245,6 +245,7 @@ class ControlScreen extends StatefulWidget {
 
 class _ControlScreenState extends State<ControlScreen> {
   static const MethodChannel _wifiChannel = MethodChannel('kidcar/wifi');
+  static const MethodChannel _powerChannel = MethodChannel('kidcar/wifi');
   static const int _minSpeed = 10;
   int _speed = _minSpeed; // 10..100
   int _throttle = 0; // -100..100
@@ -283,6 +284,7 @@ class _ControlScreenState extends State<ControlScreen> {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
+    _requestIgnoreBatteryOptimizations();
     _udp.init();
     _startConnectProbe();
     _sendState();
@@ -292,6 +294,12 @@ class _ControlScreenState extends State<ControlScreen> {
     _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       _sendState();
     });
+  }
+
+  Future<void> _requestIgnoreBatteryOptimizations() async {
+    try {
+      await _powerChannel.invokeMethod<bool>('requestIgnoreBatteryOptimizations');
+    } catch (_) {}
   }
 
   @override
