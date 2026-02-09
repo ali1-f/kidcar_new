@@ -14,8 +14,8 @@ static const int PIN_RELAY_EN = 16; // HIGH = enable
 
 // L298N (steering motor) - ENA is jumpered HIGH (no PWM on ENA)
 static const int PIN_L298_ENA = 21; // Enable (kept HIGH)
-static const int PIN_L298_IN1 = 40; // Dir
-static const int PIN_L298_IN2 = 41; // Dir
+static const int PIN_L298_IN1 = 10; // Dir
+static const int PIN_L298_IN2 = 11; // Dir
 
 // LEDC channels
 static const int CH_BTS_R = 0;
