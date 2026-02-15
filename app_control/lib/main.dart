@@ -749,7 +749,14 @@ class _ControlScreenState extends State<ControlScreen>
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            final gyroBottom = constraints.maxHeight * 0.22;
+                            const gap = 18.0;
+                            final rawHeight = (constraints.maxHeight - gap) / 2;
+                            final buttonHeight = rawHeight < 52.0
+                                ? rawHeight
+                                : (rawHeight > 120.0 ? 120.0 : rawHeight);
+                            final verticalMargin =
+                                (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
+                            final gyroBottom = verticalMargin;
                             return Stack(
                               children: [
                                 Positioned.fill(
