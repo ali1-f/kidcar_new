@@ -924,6 +924,43 @@ class ControlPad extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (isLeft) {
+          final gap = 18.0;
+          final rawWidth = (constraints.maxWidth - gap) / 2;
+          final buttonWidth = rawWidth < 90.0
+              ? rawWidth
+              : (rawWidth > 150.0 ? 150.0 : rawWidth);
+          final rawHeight = constraints.maxHeight * 0.4;
+          final buttonHeight = rawHeight < 56.0
+              ? rawHeight
+              : (rawHeight > 120.0 ? 120.0 : rawHeight);
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ControlButton(
+                icon: primaryIcon,
+                label: primaryLabel,
+                onPress: onPrimaryDown,
+                onRelease: onPrimaryUp,
+                color: const Color(0xFF0B6E8E),
+                width: buttonWidth,
+                height: buttonHeight,
+              ),
+              SizedBox(width: gap),
+              ControlButton(
+                icon: secondaryIcon,
+                label: secondaryLabel,
+                onPress: onSecondaryDown,
+                onRelease: onSecondaryUp,
+                color: const Color(0xFF159AAE),
+                width: buttonWidth,
+                height: buttonHeight,
+              ),
+            ],
+          );
+        }
+
         final gap = 18.0;
         final rawHeight = (constraints.maxHeight - gap) / 2;
         final buttonHeight = rawHeight < 52.0
