@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 void main() async {
@@ -256,6 +257,9 @@ class _ControlScreenState extends State<ControlScreen>
   bool _backPressed = false;
   bool _leftPressed = false;
   bool _rightPressed = false;
+  bool _gyroPressed = false;
+  int _gyroSteer = 0;
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
   bool _parkBlinkOn = false;
   static const Duration _steerHoldLimit = Duration(seconds: 4);
   DateTime? _steerHoldStartedAt;
@@ -314,6 +318,7 @@ class _ControlScreenState extends State<ControlScreen>
     _clockTimer?.cancel();
     _parkBlinkTimer?.cancel();
     _txTimer?.cancel();
+    _gyroSub?.cancel();
     _connectProbeTimer?.cancel();
     _heartbeatTimer?.cancel();
     WakelockPlus.disable();
@@ -357,7 +362,11 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   bool _anyPressed() {
-    return _forwardPressed || _backPressed || _leftPressed || _rightPressed;
+    return _forwardPressed ||
+        _backPressed ||
+        _leftPressed ||
+        _rightPressed ||
+        _gyroPressed;
   }
 
   void _startTxLoop() {
@@ -437,6 +446,10 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   int _computeSteerWithHoldLimit() {
+    if (_gyroPressed) {
+      return _gyroSteer;
+    }
+
     int steer = 0;
     if (_leftPressed && !_rightPressed) steer = -_speed;
     if (_rightPressed && !_leftPressed) steer = _speed;
@@ -557,6 +570,7 @@ class _ControlScreenState extends State<ControlScreen>
       'checking': 'در حال بررسی',
       'ok': 'سالم',
       'fault': 'خطا',
+      'gyro': 'ژیروسکوپ',
     };
 
     const en = {
@@ -577,6 +591,7 @@ class _ControlScreenState extends State<ControlScreen>
       'checking': 'Checking',
       'ok': 'OK',
       'fault': 'Fault',
+      'gyro': 'Gyroscope',
     };
 
     final map = (widget.lang == AppLang.fa) ? fa : en;
@@ -661,6 +676,37 @@ class _ControlScreenState extends State<ControlScreen>
     _applyMotion();
   }
 
+  void _gyroDown() {
+    if (_parked) {
+      _blinkPark();
+      _beep();
+      return;
+    }
+    if (_gyroPressed) return;
+    _gyroPressed = true;
+    _gyroSub?.cancel();
+    _gyroSub = gyroscopeEventStream().listen((event) {
+      if (!_gyroPressed) return;
+      const deadband = 0.35;
+      int nextSteer = 0;
+      if (event.z > deadband) nextSteer = _speed;
+      if (event.z < -deadband) nextSteer = -_speed;
+      if (_gyroSteer != nextSteer) {
+        _gyroSteer = nextSteer;
+        _applyMotion();
+      }
+    });
+    _applyMotion();
+  }
+
+  void _gyroUp() {
+    _gyroPressed = false;
+    _gyroSteer = 0;
+    _gyroSub?.cancel();
+    _gyroSub = null;
+    _applyMotion();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -701,16 +747,30 @@ class _ControlScreenState extends State<ControlScreen>
                   child: Row(
                     children: [
                       Expanded(
-                        child: ControlPad(
-                          primaryLabel: t('left'),
-                          secondaryLabel: t('right'),
-                          primaryIcon: Icons.arrow_back,
-                          secondaryIcon: Icons.arrow_forward,
-                          onPrimaryDown: _leftDown,
-                          onPrimaryUp: _leftUp,
-                          onSecondaryDown: _rightDown,
-                          onSecondaryUp: _rightUp,
-                          isLeft: true,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: ControlPad(
+                                primaryLabel: t('left'),
+                                secondaryLabel: t('right'),
+                                primaryIcon: Icons.arrow_back,
+                                secondaryIcon: Icons.arrow_forward,
+                                onPrimaryDown: _leftDown,
+                                onPrimaryUp: _leftUp,
+                                onSecondaryDown: _rightDown,
+                                onSecondaryUp: _rightUp,
+                                isLeft: true,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            GyroHoldButton(
+                              label: t('gyro'),
+                              onPress: _gyroDown,
+                              onRelease: _gyroUp,
+                              active: _gyroPressed,
+                            ),
+                          ],
                         ),
                       ),
                       Expanded(
@@ -1178,6 +1238,86 @@ class _ControlButtonState extends State<ControlButton> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GyroHoldButton extends StatefulWidget {
+  const GyroHoldButton({
+    super.key,
+    required this.label,
+    required this.onPress,
+    required this.onRelease,
+    required this.active,
+  });
+
+  final String label;
+  final VoidCallback onPress;
+  final VoidCallback onRelease;
+  final bool active;
+
+  @override
+  State<GyroHoldButton> createState() => _GyroHoldButtonState();
+}
+
+class _GyroHoldButtonState extends State<GyroHoldButton> {
+  bool _pressed = false;
+  int _activePointers = 0;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool visualOn = _pressed || widget.active;
+    return Listener(
+      onPointerDown: (_) {
+        _activePointers += 1;
+        _setPressed(true);
+        widget.onPress();
+      },
+      onPointerUp: (_) {
+        _activePointers = (_activePointers - 1).clamp(0, 999999);
+        if (_activePointers == 0) {
+          _setPressed(false);
+          widget.onRelease();
+        }
+      },
+      onPointerCancel: (_) {
+        _activePointers = (_activePointers - 1).clamp(0, 999999);
+        if (_activePointers == 0) {
+          _setPressed(false);
+          widget.onRelease();
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: 220,
+        height: 54,
+        decoration: BoxDecoration(
+          color: visualOn ? const Color(0xFF0E4F65) : const Color(0xFF167B9A),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            widget.label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
