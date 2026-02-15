@@ -687,7 +687,7 @@ class _ControlScreenState extends State<ControlScreen>
     _gyroSub?.cancel();
     _gyroSub = gyroscopeEventStream().listen((event) {
       if (!_gyroPressed) return;
-      const deadband = 0.35;
+      const deadband = 0.18;
       int nextSteer = 0;
       if (event.z > deadband) nextSteer = _speed;
       if (event.z < -deadband) nextSteer = -_speed;
