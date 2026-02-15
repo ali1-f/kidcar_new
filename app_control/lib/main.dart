@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -189,6 +190,7 @@ class UdpSender {
   set address(InternetAddress addr) => _address = addr;
 
   Future<void> init() async {
+    if (kIsWeb) return;
     _socket ??= await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
     _socket!.broadcastEnabled = true;
     _address ??= InternetAddress(host);
@@ -281,6 +283,9 @@ class _ControlScreenState extends State<ControlScreen>
   DateTime _now = DateTime.now();
   Timer? _clockTimer;
   Timer? _heartbeatTimer;
+  Timer? _spaceHoldTimer;
+  final Set<LogicalKeyboardKey> _keysDown = <LogicalKeyboardKey>{};
+  final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'kidcar_keyboard');
 
   late final UdpSender _udp = UdpSender(
     host: '255.255.255.255',
@@ -304,6 +309,11 @@ class _ControlScreenState extends State<ControlScreen>
     _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       _sendState();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _keyboardFocusNode.requestFocus();
+      }
+    });
   }
 
   Future<void> _requestIgnoreBatteryOptimizations() async {
@@ -321,10 +331,15 @@ class _ControlScreenState extends State<ControlScreen>
     _gyroSub?.cancel();
     _connectProbeTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _spaceHoldTimer?.cancel();
+    _keyboardFocusNode.dispose();
     WakelockPlus.disable();
     _udp.dispose();
     super.dispose();
   }
+
+  bool get _isWindowsPlatform =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -334,6 +349,7 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   Future<void> _reconnectAfterResume() async {
+    if (kIsWeb) return;
     _espAddress = null;
     _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
     if (mounted) {
@@ -479,6 +495,7 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   void _sendState() {
+    if (kIsWeb) return;
     final enforcedSteer = _computeSteerWithHoldLimit();
     if (_steer != enforcedSteer) {
       _steer = enforcedSteer;
@@ -518,6 +535,23 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   Future<void> _showWifiName() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi‑Fi Network'),
+          content: Text((widget.lang == AppLang.fa) ? 'نامشخص' : 'Unknown'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text((widget.lang == AppLang.fa) ? 'باشه' : 'OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     String name = '';
     try {
       final result = await _wifiChannel.invokeMethod<String>('getWifiName');
@@ -545,6 +579,7 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   void _sendTestUdp() {
+    if (kIsWeb) return;
     final payload = _controlPayload(includePing: true);
     _udp.sendTo(InternetAddress('192.168.4.1'), payload);
     _udp.sendTo(InternetAddress('192.168.4.255'), payload);
@@ -707,141 +742,246 @@ class _ControlScreenState extends State<ControlScreen>
     _applyMotion();
   }
 
+  void _togglePark() {
+    setState(() {
+      _parked = !_parked;
+      if (_parked) {
+        _forwardPressed = false;
+        _backPressed = false;
+        _leftPressed = false;
+        _rightPressed = false;
+      }
+    });
+    if (_parked) {
+      _stopTxLoop();
+      _applyMotion();
+    } else {
+      _sendState();
+    }
+  }
+
+  void _increaseSpeed() {
+    final next = (_speed + 5).clamp(_minSpeed, 100).toInt();
+    if (next == _speed) return;
+    setState(() => _speed = next);
+    _sendState();
+  }
+
+  void _decreaseSpeed() {
+    final next = (_speed - 5).clamp(_minSpeed, 100).toInt();
+    if (next == _speed) return;
+    setState(() => _speed = next);
+    _sendState();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (event is KeyDownEvent) {
+      final firstDown = _keysDown.add(key);
+      if (key == LogicalKeyboardKey.arrowUp) {
+        if (!_forwardPressed) _forwardDown();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        if (!_backPressed) _backDown();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        if (!_leftPressed) _leftDown();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        if (!_rightPressed) _rightDown();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.space) {
+        if (firstDown) {
+          _spaceHoldTimer?.cancel();
+          _spaceHoldTimer = Timer(const Duration(seconds: 2), () {
+            if (!mounted) return;
+            if (_keysDown.contains(LogicalKeyboardKey.space)) {
+              _togglePark();
+            }
+          });
+        }
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.pageUp && firstDown) {
+        _increaseSpeed();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.pageDown && firstDown) {
+        _decreaseSpeed();
+        return KeyEventResult.handled;
+      }
+    }
+    if (event is KeyUpEvent) {
+      _keysDown.remove(key);
+      if (key == LogicalKeyboardKey.space) {
+        _spaceHoldTimer?.cancel();
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        if (_forwardPressed) _forwardUp();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        if (_backPressed) _backUp();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        if (_leftPressed) _leftUp();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        if (_rightPressed) _rightUp();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF5F7FA), Color(0xFFE8EEF3)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    return Focus(
+      focusNode: _keyboardFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFF5F7FA), Color(0xFFE8EEF3)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              StatusBarWidget(
-                title: t('app_title'),
-                battery: _battery,
-                signal: _signal,
-                connected: _connected,
-                connectedLabel: _connected ? t('connected') : t('disconnected'),
-                espStatusLabel: _espStatus == 'OK'
-                    ? t('ok')
-                    : _espStatus == 'FAULT'
-                    ? t('fault')
-                    : t('checking'),
-                lang: widget.lang,
-                now: _now,
-                onChangeLanguage: widget.onChangeLanguage,
-                onWifiTap: _showWifiName,
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            const gap = 18.0;
-                            final rawHeight = (constraints.maxHeight - gap) / 2;
-                            final buttonHeight = rawHeight < 52.0
-                                ? rawHeight
-                                : (rawHeight > 120.0 ? 120.0 : rawHeight);
-                            final verticalMargin =
-                                (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
-                            final gyroBottom = verticalMargin;
-                            return Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: ControlPad(
-                                    primaryLabel: t('left'),
-                                    secondaryLabel: t('right'),
-                                    primaryIcon: Icons.arrow_back,
-                                    secondaryIcon: Icons.arrow_forward,
-                                    onPrimaryDown: _leftDown,
-                                    onPrimaryUp: _leftUp,
-                                    onSecondaryDown: _rightDown,
-                                    onSecondaryUp: _rightUp,
-                                    isLeft: true,
-                                  ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                StatusBarWidget(
+                  title: t('app_title'),
+                  battery: _battery,
+                  signal: _signal,
+                  connected: _connected,
+                  connectedLabel: _connected ? t('connected') : t('disconnected'),
+                  espStatusLabel: _espStatus == 'OK'
+                      ? t('ok')
+                      : _espStatus == 'FAULT'
+                      ? t('fault')
+                      : t('checking'),
+                  lang: widget.lang,
+                  now: _now,
+                  onChangeLanguage: widget.onChangeLanguage,
+                  onWifiTap: _showWifiName,
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _isWindowsPlatform
+                              ? ControlPad(
+                                  primaryLabel: t('left'),
+                                  secondaryLabel: t('right'),
+                                  primaryIcon: Icons.arrow_back,
+                                  secondaryIcon: Icons.arrow_forward,
+                                  onPrimaryDown: _leftDown,
+                                  onPrimaryUp: _leftUp,
+                                  onSecondaryDown: _rightDown,
+                                  onSecondaryUp: _rightUp,
+                                  isLeft: true,
+                                  primaryActive: _leftPressed,
+                                  secondaryActive: _rightPressed,
+                                )
+                              : LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    const gap = 18.0;
+                                    final rawHeight = (constraints.maxHeight - gap) / 2;
+                                    final buttonHeight = rawHeight < 52.0
+                                        ? rawHeight
+                                        : (rawHeight > 120.0 ? 120.0 : rawHeight);
+                                    final verticalMargin =
+                                        (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
+                                    final gyroBottom = verticalMargin;
+                                    return Stack(
+                                      children: [
+                                        Positioned.fill(
+                                          child: ControlPad(
+                                            primaryLabel: t('left'),
+                                            secondaryLabel: t('right'),
+                                            primaryIcon: Icons.arrow_back,
+                                            secondaryIcon: Icons.arrow_forward,
+                                            onPrimaryDown: _leftDown,
+                                            onPrimaryUp: _leftUp,
+                                            onSecondaryDown: _rightDown,
+                                            onSecondaryUp: _rightUp,
+                                            isLeft: true,
+                                            primaryActive: _leftPressed,
+                                            secondaryActive: _rightPressed,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          left: 0,
+                                          right: 0,
+                                          bottom: gyroBottom,
+                                          child: Center(
+                                            child: GyroHoldButton(
+                                              label: t('gyro'),
+                                              onPress: _gyroDown,
+                                              onRelease: _gyroUp,
+                                              active: _gyroPressed,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: gyroBottom,
-                                  child: Center(
-                                    child: GyroHoldButton(
-                                      label: t('gyro'),
-                                      onPress: _gyroDown,
-                                      onRelease: _gyroUp,
-                                      active: _gyroPressed,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
                         ),
-                      ),
-                      Expanded(
-                        child: CenterPanel(
-                          speed: _speed,
-                          minSpeed: _minSpeed,
-                          onSpeedChanged: (v) {
-                            setState(() => _speed = v);
-                            _sendState();
-                          },
-                          parked: _parked,
-                          parkBlink: _parkBlinkOn,
-                          onParkToggle: () {
-                            setState(() {
-                              _parked = !_parked;
-                              if (_parked) {
-                                _forwardPressed = false;
-                                _backPressed = false;
-                                _leftPressed = false;
-                                _rightPressed = false;
-                              }
-                            });
-                            if (_parked) {
-                              _stopTxLoop();
-                              _applyMotion();
-                            } else {
+                        Expanded(
+                          child: CenterPanel(
+                            speed: _speed,
+                            minSpeed: _minSpeed,
+                            onSpeedChanged: (v) {
+                              setState(() => _speed = v);
                               _sendState();
-                            }
-                          },
-                          parkLabel: t('park'),
-                          parkHint: t('hold_to_drive'),
-                          statusText: _parked
-                              ? t('drive_locked')
-                              : t('drive_unlocked'),
+                            },
+                            parked: _parked,
+                            parkBlink: _parkBlinkOn,
+                            onParkToggle: _togglePark,
+                            parkLabel: t('park'),
+                            parkHint: t('hold_to_drive'),
+                            statusText: _parked
+                                ? t('drive_locked')
+                                : t('drive_unlocked'),
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: ControlPad(
-                          primaryLabel: t('forward'),
-                          secondaryLabel: t('back'),
-                          primaryIcon: Icons.arrow_upward,
-                          secondaryIcon: Icons.arrow_downward,
-                          onPrimaryDown: _forwardDown,
-                          onPrimaryUp: _forwardUp,
-                          onSecondaryDown: _backDown,
-                          onSecondaryUp: _backUp,
-                          isLeft: false,
+                        Expanded(
+                          child: ControlPad(
+                            primaryLabel: t('forward'),
+                            secondaryLabel: t('back'),
+                            primaryIcon: Icons.arrow_upward,
+                            secondaryIcon: Icons.arrow_downward,
+                            onPrimaryDown: _forwardDown,
+                            onPrimaryUp: _forwardUp,
+                            onSecondaryDown: _backDown,
+                            onSecondaryUp: _backUp,
+                            isLeft: false,
+                            primaryActive: _forwardPressed,
+                            secondaryActive: _backPressed,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1045,6 +1185,8 @@ class ControlPad extends StatelessWidget {
     required this.onSecondaryDown,
     required this.onSecondaryUp,
     required this.isLeft,
+    required this.primaryActive,
+    required this.secondaryActive,
   });
 
   final String primaryLabel;
@@ -1056,6 +1198,8 @@ class ControlPad extends StatelessWidget {
   final VoidCallback onSecondaryDown;
   final VoidCallback onSecondaryUp;
   final bool isLeft;
+  final bool primaryActive;
+  final bool secondaryActive;
 
   @override
   Widget build(BuildContext context) {
@@ -1080,6 +1224,7 @@ class ControlPad extends StatelessWidget {
                 label: primaryLabel,
                 onPress: onPrimaryDown,
                 onRelease: onPrimaryUp,
+                active: primaryActive,
                 color: const Color(0xFF0B6E8E),
                 width: buttonWidth,
                 height: buttonHeight,
@@ -1090,6 +1235,7 @@ class ControlPad extends StatelessWidget {
                 label: secondaryLabel,
                 onPress: onSecondaryDown,
                 onRelease: onSecondaryUp,
+                active: secondaryActive,
                 color: const Color(0xFF159AAE),
                 width: buttonWidth,
                 height: buttonHeight,
@@ -1116,6 +1262,7 @@ class ControlPad extends StatelessWidget {
               label: primaryLabel,
               onPress: onPrimaryDown,
               onRelease: onPrimaryUp,
+              active: primaryActive,
               color: const Color(0xFF0B6E8E),
               width: buttonWidth,
               height: buttonHeight,
@@ -1126,6 +1273,7 @@ class ControlPad extends StatelessWidget {
               label: secondaryLabel,
               onPress: onSecondaryDown,
               onRelease: onSecondaryUp,
+              active: secondaryActive,
               color: const Color(0xFF159AAE),
               width: buttonWidth,
               height: buttonHeight,
@@ -1144,6 +1292,7 @@ class ControlButton extends StatefulWidget {
     required this.label,
     required this.onPress,
     required this.onRelease,
+    required this.active,
     required this.color,
     required this.width,
     required this.height,
@@ -1153,6 +1302,7 @@ class ControlButton extends StatefulWidget {
   final String label;
   final VoidCallback onPress;
   final VoidCallback onRelease;
+  final bool active;
   final Color color;
   final double width;
   final double height;
@@ -1172,8 +1322,9 @@ class _ControlButtonState extends State<ControlButton> {
 
   @override
   Widget build(BuildContext context) {
-    final pressScale = _pressed ? 0.97 : 1.0;
-    final overlayOpacity = _pressed ? 0.2 : 0.0;
+    final visualOn = _pressed || widget.active;
+    final pressScale = visualOn ? 0.97 : 1.0;
+    final overlayOpacity = visualOn ? 0.2 : 0.0;
 
     return Listener(
       onPointerDown: (_) {
