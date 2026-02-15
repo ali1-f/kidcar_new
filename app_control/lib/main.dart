@@ -247,8 +247,8 @@ class _ControlScreenState extends State<ControlScreen>
     with WidgetsBindingObserver {
   static const MethodChannel _wifiChannel = MethodChannel('kidcar/wifi');
   static const MethodChannel _powerChannel = MethodChannel('kidcar/wifi');
-  static const int _minSpeed = 10;
-  int _speed = _minSpeed; // 10..100
+  static const int _minSpeed = 20;
+  int _speed = 50; // 20..100
   int _throttle = 0; // -100..100
   int _steer = 0; // -100..100
   bool _parked = true;
