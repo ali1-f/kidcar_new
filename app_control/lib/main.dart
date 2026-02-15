@@ -257,7 +257,7 @@ class _ControlScreenState extends State<ControlScreen>
   bool _leftPressed = false;
   bool _rightPressed = false;
   bool _parkBlinkOn = false;
-  static const Duration _steerHoldLimit = Duration(seconds: 5);
+  static const Duration _steerHoldLimit = Duration(seconds: 4);
   DateTime? _steerHoldStartedAt;
   bool _steerHoldLockedUntilRelease = false;
   int _steerHoldDirection = 0; // -1 left, 1 right
