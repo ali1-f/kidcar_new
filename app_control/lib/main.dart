@@ -747,30 +747,40 @@ class _ControlScreenState extends State<ControlScreen>
                   child: Row(
                     children: [
                       Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: ControlPad(
-                                primaryLabel: t('left'),
-                                secondaryLabel: t('right'),
-                                primaryIcon: Icons.arrow_back,
-                                secondaryIcon: Icons.arrow_forward,
-                                onPrimaryDown: _leftDown,
-                                onPrimaryUp: _leftUp,
-                                onSecondaryDown: _rightDown,
-                                onSecondaryUp: _rightUp,
-                                isLeft: true,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            GyroHoldButton(
-                              label: t('gyro'),
-                              onPress: _gyroDown,
-                              onRelease: _gyroUp,
-                              active: _gyroPressed,
-                            ),
-                          ],
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final gyroBottom = constraints.maxHeight * 0.22;
+                            return Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: ControlPad(
+                                    primaryLabel: t('left'),
+                                    secondaryLabel: t('right'),
+                                    primaryIcon: Icons.arrow_back,
+                                    secondaryIcon: Icons.arrow_forward,
+                                    onPrimaryDown: _leftDown,
+                                    onPrimaryUp: _leftUp,
+                                    onSecondaryDown: _rightDown,
+                                    onSecondaryUp: _rightUp,
+                                    isLeft: true,
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: gyroBottom,
+                                  child: Center(
+                                    child: GyroHoldButton(
+                                      label: t('gyro'),
+                                      onPress: _gyroDown,
+                                      onRelease: _gyroUp,
+                                      active: _gyroPressed,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                       Expanded(
