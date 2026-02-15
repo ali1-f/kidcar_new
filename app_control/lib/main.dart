@@ -436,7 +436,41 @@ class _ControlScreenState extends State<ControlScreen>
     return payload;
   }
 
+  int _computeSteerWithHoldLimit() {
+    int steer = 0;
+    if (_leftPressed && !_rightPressed) steer = -_speed;
+    if (_rightPressed && !_leftPressed) steer = _speed;
+
+    final int steerDir = steer > 0 ? 1 : (steer < 0 ? -1 : 0);
+    if (steerDir == 0) {
+      _steerHoldStartedAt = null;
+      _steerHoldLockedUntilRelease = false;
+      _steerHoldDirection = 0;
+      return 0;
+    }
+    if (_steerHoldLockedUntilRelease) {
+      return 0;
+    }
+
+    final now = DateTime.now();
+    if (_steerHoldDirection != steerDir || _steerHoldStartedAt == null) {
+      _steerHoldDirection = steerDir;
+      _steerHoldStartedAt = now;
+      return steer;
+    }
+    if (now.difference(_steerHoldStartedAt!) >= _steerHoldLimit) {
+      _steerHoldLockedUntilRelease = true;
+      return 0;
+    }
+    return steer;
+  }
+
   void _sendState() {
+    final enforcedSteer = _computeSteerWithHoldLimit();
+    if (_steer != enforcedSteer) {
+      _steer = enforcedSteer;
+    }
+
     final msSinceAck = DateTime.now().difference(_lastAck).inMilliseconds;
     final isConnected = msSinceAck < 3000;
     if (isConnected != _connected) {
@@ -553,27 +587,7 @@ class _ControlScreenState extends State<ControlScreen>
     int throttle = 0;
     if (_forwardPressed && !_backPressed) throttle = _speed;
     if (_backPressed && !_forwardPressed) throttle = -_speed;
-    int steer = 0;
-    if (_leftPressed && !_rightPressed) steer = -_speed;
-    if (_rightPressed && !_leftPressed) steer = _speed;
-
-    final int steerDir = steer > 0 ? 1 : (steer < 0 ? -1 : 0);
-    if (steerDir == 0) {
-      _steerHoldStartedAt = null;
-      _steerHoldLockedUntilRelease = false;
-      _steerHoldDirection = 0;
-    } else if (_steerHoldLockedUntilRelease) {
-      steer = 0;
-    } else {
-      final now = DateTime.now();
-      if (_steerHoldDirection != steerDir || _steerHoldStartedAt == null) {
-        _steerHoldDirection = steerDir;
-        _steerHoldStartedAt = now;
-      } else if (now.difference(_steerHoldStartedAt!) >= _steerHoldLimit) {
-        _steerHoldLockedUntilRelease = true;
-        steer = 0;
-      }
-    }
+    final steer = _computeSteerWithHoldLimit();
 
     setState(() {
       _throttle = throttle;
