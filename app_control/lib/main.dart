@@ -243,7 +243,8 @@ class ControlScreen extends StatefulWidget {
   State<ControlScreen> createState() => _ControlScreenState();
 }
 
-class _ControlScreenState extends State<ControlScreen> {
+class _ControlScreenState extends State<ControlScreen>
+    with WidgetsBindingObserver {
   static const MethodChannel _wifiChannel = MethodChannel('kidcar/wifi');
   static const MethodChannel _powerChannel = MethodChannel('kidcar/wifi');
   static const int _minSpeed = 10;
@@ -282,6 +283,7 @@ class _ControlScreenState extends State<ControlScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
     _requestIgnoreBatteryOptimizations();
@@ -304,6 +306,7 @@ class _ControlScreenState extends State<ControlScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clockTimer?.cancel();
     _parkBlinkTimer?.cancel();
     _txTimer?.cancel();
@@ -312,6 +315,28 @@ class _ControlScreenState extends State<ControlScreen> {
     WakelockPlus.disable();
     _udp.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconnectAfterResume();
+    }
+  }
+
+  Future<void> _reconnectAfterResume() async {
+    _espAddress = null;
+    _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
+    if (mounted) {
+      setState(() {
+        _connected = false;
+        _signal = 0;
+        _espStatus = 'CHECKING';
+      });
+    }
+    await _udp.reset();
+    _startConnectProbe();
+    _sendState();
   }
 
   void _startConnectProbe() {
