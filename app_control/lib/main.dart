@@ -257,6 +257,10 @@ class _ControlScreenState extends State<ControlScreen>
   bool _leftPressed = false;
   bool _rightPressed = false;
   bool _parkBlinkOn = false;
+  static const Duration _steerHoldLimit = Duration(seconds: 5);
+  DateTime? _steerHoldStartedAt;
+  bool _steerHoldLockedUntilRelease = false;
+  int _steerHoldDirection = 0; // -1 left, 1 right
   Timer? _parkBlinkTimer;
   Timer? _txTimer;
   Timer? _connectProbeTimer;
@@ -552,6 +556,24 @@ class _ControlScreenState extends State<ControlScreen>
     int steer = 0;
     if (_leftPressed && !_rightPressed) steer = -_speed;
     if (_rightPressed && !_leftPressed) steer = _speed;
+
+    final int steerDir = steer > 0 ? 1 : (steer < 0 ? -1 : 0);
+    if (steerDir == 0) {
+      _steerHoldStartedAt = null;
+      _steerHoldLockedUntilRelease = false;
+      _steerHoldDirection = 0;
+    } else if (_steerHoldLockedUntilRelease) {
+      steer = 0;
+    } else {
+      final now = DateTime.now();
+      if (_steerHoldDirection != steerDir || _steerHoldStartedAt == null) {
+        _steerHoldDirection = steerDir;
+        _steerHoldStartedAt = now;
+      } else if (now.difference(_steerHoldStartedAt!) >= _steerHoldLimit) {
+        _steerHoldLockedUntilRelease = true;
+        steer = 0;
+      }
+    }
 
     setState(() {
       _throttle = throttle;
