@@ -67,9 +67,8 @@ class _KidCarAppState extends State<KidCarApp> {
         ),
       ),
       builder: (context, child) {
-        final direction = (lang == AppLang.fa)
-            ? TextDirection.rtl
-            : TextDirection.ltr;
+        // Keep physical layout identical in both languages; only labels change.
+        const direction = TextDirection.ltr;
         return Directionality(
           textDirection: direction,
           child: child ?? const SizedBox(),
