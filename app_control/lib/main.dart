@@ -283,7 +283,6 @@ class _ControlScreenState extends State<ControlScreen>
   DateTime _now = DateTime.now();
   Timer? _clockTimer;
   Timer? _heartbeatTimer;
-  Timer? _spaceHoldTimer;
   final Set<LogicalKeyboardKey> _keysDown = <LogicalKeyboardKey>{};
   final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'kidcar_keyboard');
 
@@ -331,15 +330,11 @@ class _ControlScreenState extends State<ControlScreen>
     _gyroSub?.cancel();
     _connectProbeTimer?.cancel();
     _heartbeatTimer?.cancel();
-    _spaceHoldTimer?.cancel();
     _keyboardFocusNode.dispose();
     WakelockPlus.disable();
     _udp.dispose();
     super.dispose();
   }
-
-  bool get _isWindowsPlatform =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -794,16 +789,8 @@ class _ControlScreenState extends State<ControlScreen>
         if (!_rightPressed) _rightDown();
         return KeyEventResult.handled;
       }
-      if (key == LogicalKeyboardKey.space) {
-        if (firstDown) {
-          _spaceHoldTimer?.cancel();
-          _spaceHoldTimer = Timer(const Duration(seconds: 2), () {
-            if (!mounted) return;
-            if (_keysDown.contains(LogicalKeyboardKey.space)) {
-              _togglePark();
-            }
-          });
-        }
+      if (key == LogicalKeyboardKey.space && firstDown) {
+        _togglePark();
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.pageUp && firstDown) {
@@ -817,9 +804,6 @@ class _ControlScreenState extends State<ControlScreen>
     }
     if (event is KeyUpEvent) {
       _keysDown.remove(key);
-      if (key == LogicalKeyboardKey.space) {
-        _spaceHoldTimer?.cancel();
-      }
       if (key == LogicalKeyboardKey.arrowUp) {
         if (_forwardPressed) _forwardUp();
         return KeyEventResult.handled;
@@ -884,64 +868,48 @@ class _ControlScreenState extends State<ControlScreen>
                     child: Row(
                       children: [
                         Expanded(
-                          child: _isWindowsPlatform
-                              ? ControlPad(
-                                  primaryLabel: t('left'),
-                                  secondaryLabel: t('right'),
-                                  primaryIcon: Icons.arrow_back,
-                                  secondaryIcon: Icons.arrow_forward,
-                                  onPrimaryDown: _leftDown,
-                                  onPrimaryUp: _leftUp,
-                                  onSecondaryDown: _rightDown,
-                                  onSecondaryUp: _rightUp,
-                                  isLeft: true,
-                                  primaryActive: _leftPressed,
-                                  secondaryActive: _rightPressed,
-                                )
-                              : LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    const gap = 18.0;
-                                    final rawHeight = (constraints.maxHeight - gap) / 2;
-                                    final buttonHeight = rawHeight < 52.0
-                                        ? rawHeight
-                                        : (rawHeight > 120.0 ? 120.0 : rawHeight);
-                                    final verticalMargin =
-                                        (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
-                                    final gyroBottom = verticalMargin;
-                                    return Stack(
-                                      children: [
-                                        Positioned.fill(
-                                          child: ControlPad(
-                                            primaryLabel: t('left'),
-                                            secondaryLabel: t('right'),
-                                            primaryIcon: Icons.arrow_back,
-                                            secondaryIcon: Icons.arrow_forward,
-                                            onPrimaryDown: _leftDown,
-                                            onPrimaryUp: _leftUp,
-                                            onSecondaryDown: _rightDown,
-                                            onSecondaryUp: _rightUp,
-                                            isLeft: true,
-                                            primaryActive: _leftPressed,
-                                            secondaryActive: _rightPressed,
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: 0,
-                                          right: 0,
-                                          bottom: gyroBottom,
-                                          child: Center(
-                                            child: GyroHoldButton(
-                                              label: t('gyro'),
-                                              onPress: _gyroDown,
-                                              onRelease: _gyroUp,
-                                              active: _gyroPressed,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              const gap = 18.0;
+                              final rawHeight = (constraints.maxHeight - gap) / 2;
+                              final buttonHeight = rawHeight < 52.0
+                                  ? rawHeight
+                                  : (rawHeight > 120.0 ? 120.0 : rawHeight);
+                              final verticalMargin =
+                                  (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
+                              final gyroBottom = verticalMargin;
+                              return Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: ControlPad(
+                                      primaryLabel: t('left'),
+                                      secondaryLabel: t('right'),
+                                      primaryIcon: Icons.arrow_back,
+                                      secondaryIcon: Icons.arrow_forward,
+                                      onPrimaryDown: _leftDown,
+                                      onPrimaryUp: _leftUp,
+                                      onSecondaryDown: _rightDown,
+                                      onSecondaryUp: _rightUp,
+                                      isLeft: true,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: gyroBottom,
+                                    child: Center(
+                                      child: GyroHoldButton(
+                                        label: t('gyro'),
+                                        onPress: _gyroDown,
+                                        onRelease: _gyroUp,
+                                        active: _gyroPressed,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                         Expanded(
                           child: CenterPanel(
@@ -972,8 +940,6 @@ class _ControlScreenState extends State<ControlScreen>
                             onSecondaryDown: _backDown,
                             onSecondaryUp: _backUp,
                             isLeft: false,
-                            primaryActive: _forwardPressed,
-                            secondaryActive: _backPressed,
                           ),
                         ),
                       ],
@@ -1185,8 +1151,6 @@ class ControlPad extends StatelessWidget {
     required this.onSecondaryDown,
     required this.onSecondaryUp,
     required this.isLeft,
-    required this.primaryActive,
-    required this.secondaryActive,
   });
 
   final String primaryLabel;
@@ -1198,8 +1162,6 @@ class ControlPad extends StatelessWidget {
   final VoidCallback onSecondaryDown;
   final VoidCallback onSecondaryUp;
   final bool isLeft;
-  final bool primaryActive;
-  final bool secondaryActive;
 
   @override
   Widget build(BuildContext context) {
@@ -1224,7 +1186,6 @@ class ControlPad extends StatelessWidget {
                 label: primaryLabel,
                 onPress: onPrimaryDown,
                 onRelease: onPrimaryUp,
-                active: primaryActive,
                 color: const Color(0xFF0B6E8E),
                 width: buttonWidth,
                 height: buttonHeight,
@@ -1235,7 +1196,6 @@ class ControlPad extends StatelessWidget {
                 label: secondaryLabel,
                 onPress: onSecondaryDown,
                 onRelease: onSecondaryUp,
-                active: secondaryActive,
                 color: const Color(0xFF159AAE),
                 width: buttonWidth,
                 height: buttonHeight,
@@ -1262,7 +1222,6 @@ class ControlPad extends StatelessWidget {
               label: primaryLabel,
               onPress: onPrimaryDown,
               onRelease: onPrimaryUp,
-              active: primaryActive,
               color: const Color(0xFF0B6E8E),
               width: buttonWidth,
               height: buttonHeight,
@@ -1273,7 +1232,6 @@ class ControlPad extends StatelessWidget {
               label: secondaryLabel,
               onPress: onSecondaryDown,
               onRelease: onSecondaryUp,
-              active: secondaryActive,
               color: const Color(0xFF159AAE),
               width: buttonWidth,
               height: buttonHeight,
@@ -1292,7 +1250,6 @@ class ControlButton extends StatefulWidget {
     required this.label,
     required this.onPress,
     required this.onRelease,
-    required this.active,
     required this.color,
     required this.width,
     required this.height,
@@ -1302,7 +1259,6 @@ class ControlButton extends StatefulWidget {
   final String label;
   final VoidCallback onPress;
   final VoidCallback onRelease;
-  final bool active;
   final Color color;
   final double width;
   final double height;
@@ -1322,9 +1278,8 @@ class _ControlButtonState extends State<ControlButton> {
 
   @override
   Widget build(BuildContext context) {
-    final visualOn = _pressed || widget.active;
-    final pressScale = visualOn ? 0.97 : 1.0;
-    final overlayOpacity = visualOn ? 0.2 : 0.0;
+    final pressScale = _pressed ? 0.97 : 1.0;
+    final overlayOpacity = _pressed ? 0.2 : 0.0;
 
     return Listener(
       onPointerDown: (_) {
