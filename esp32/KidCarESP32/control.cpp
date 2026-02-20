@@ -201,7 +201,7 @@ void controlLoop() {
 
   // Smooth battery voltage for stable UI readout
   const float instantBattery = readBatteryVoltageInstant();
-  batteryVoltage = (batteryVoltage * 0.85f) + (instantBattery * 0.15f);
+  batteryVoltage = instantBattery;
 
   const ControlCommand cmd = resolveDriveCommand();
   if (cmd.throttle > 0) driveDir = 1;
@@ -327,6 +327,7 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
 
 
 
