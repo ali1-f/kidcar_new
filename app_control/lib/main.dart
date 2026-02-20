@@ -32,6 +32,7 @@ enum AppLang { fa, en }
 class KidCarApp extends StatefulWidget {
   const KidCarApp({super.key});
 
+
   @override
   State<KidCarApp> createState() => _KidCarAppState();
 }
@@ -296,6 +297,12 @@ class _ControlScreenState extends State<ControlScreen>
   Timer? _heartbeatTimer;
   final Set<LogicalKeyboardKey> _keysDown = <LogicalKeyboardKey>{};
   final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'kidcar_keyboard');
+
+  bool get _isMobilePlatform {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
 
   late final UdpSender _udp = UdpSender(
     host: '255.255.255.255',
@@ -783,8 +790,8 @@ class _ControlScreenState extends State<ControlScreen>
       if (!_gyroPressed) return;
       const deadband = 0.18;
       int nextSteer = 0;
-      if (event.z > deadband) nextSteer = _speed;
-      if (event.z < -deadband) nextSteer = -_speed;
+      if (event.z > deadband) nextSteer = -_speed;
+      if (event.z < -deadband) nextSteer = _speed;
       if (_gyroSteer != nextSteer) {
         _gyroSteer = nextSteer;
         _applyMotion();
@@ -983,6 +990,7 @@ class _ControlScreenState extends State<ControlScreen>
                                       isLeft: true,
                                     ),
                                   ),
+                                  if (_isMobilePlatform)
                                   Positioned(
                                     left: 0,
                                     right: 0,
