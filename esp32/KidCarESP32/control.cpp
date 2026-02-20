@@ -97,12 +97,28 @@ static int readManualThrottlePct() {
   return pct;
 }
 
+static float readManualThrottleVoltage() {
+  const int raw = readAdcAvg(PIN_MANUAL_THROTTLE, 6);
+  return ((float)raw * 3.3f) / 4095.0f;
+}
+
 static ControlCommand resolveDriveCommand() {
   ControlCommand cmd = lastCmd;
   manualActive = (!appConnected) || lastCmd.manualMode;
   manualGear = 0;
 
   if (manualActive) {
+    const float throttleV = readManualThrottleVoltage();
+    if (throttleV > 2.0f) {
+      // Highest priority: if throttle input is above 2V, force full stop.
+      manualGear = 0;
+      cmd.throttle = 0;
+      cmd.steer = 0;
+      cmd.steerMs = STEER_MAX_MS;
+      cmd.speed = 0;
+      return cmd;
+    }
+
     const bool fwd = digitalRead(PIN_MANUAL_FWD) == LOW;   // active-low
     const bool back = digitalRead(PIN_MANUAL_BACK) == LOW; // active-low
 
