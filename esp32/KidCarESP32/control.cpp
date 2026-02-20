@@ -23,6 +23,7 @@ static bool selectorBackActive = false;
 static float selectorThrottleVoltage = 0.0f;
 static uint8_t selectorThrottlePct = 0;
 static uint32_t lastAnalogLogMs = 0;
+static const float BATTERY_ADC_PIN_CAL_FACTOR = 1.0452f; // 2.31V meter / 2.21V ADC
 
 static void setRgb(uint8_t r, uint8_t g, uint8_t b) {
   rgbLedWrite(RGB_PIN, r, g, b);
@@ -55,7 +56,7 @@ static float readBatteryVoltageInstant() {
 
 static float readBatteryAdcVoltage() {
   const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
-  return ((float)raw * 3.3f) / 4095.0f;
+  return (((float)raw * 3.3f) / 4095.0f) * BATTERY_ADC_PIN_CAL_FACTOR;
 }
 
 
@@ -326,6 +327,8 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
+
 
 
 
