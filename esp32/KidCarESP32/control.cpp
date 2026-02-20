@@ -48,7 +48,7 @@ static float readBatteryVoltageInstant() {
   const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
   const float vAdc = (((float)raw * 3.3f) / 4095.0f) * BATTERY_ADC_PIN_CAL_FACTOR;
   const float divider = (100.0f + 22.0f) / 22.0f;
-  float vBat = vAdc * divider * BATTERY_VOLT_CAL_FACTOR;
+  float vBat = vAdc * divider;
   if (vBat < 0.0f) vBat = 0.0f;
   if (vBat > 20.0f) vBat = 20.0f;
   return vBat;
@@ -327,6 +327,7 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
 
 
 
