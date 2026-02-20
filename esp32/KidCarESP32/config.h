@@ -20,6 +20,10 @@ static const uint8_t STEER_MAX_PWM_PCT = 60; // unused when PWM disabled
 static const uint8_t REAR_SOFTSTART_MIN_PCT = 20; // safe start percent
 static const uint16_t REAR_RAMP_MS = 600; // time to ramp to target
 
+// Battery voltage calibration factor
+// Calibrated with measured values: Vbat=11.14V, Vadc=2.058V (100k/22k divider).
+static const float BATTERY_VOLT_CAL_FACTOR = 0.9761f;
+
 // Network settings
 static const char* AP_SSID = "KidCar";
 static const char* AP_PASS = "88958004";

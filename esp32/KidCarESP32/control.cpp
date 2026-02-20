@@ -59,7 +59,7 @@ static float readBatteryVoltageInstant() {
   const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
   const float vAdc = ((float)raw * 3.3f) / 4095.0f;
   const float divider = (100.0f + 22.0f) / 22.0f;
-  float vBat = vAdc * divider;
+  float vBat = vAdc * divider * BATTERY_VOLT_CAL_FACTOR;
   if (vBat < 0.0f) vBat = 0.0f;
   if (vBat > 20.0f) vBat = 20.0f;
   return vBat;
