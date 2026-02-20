@@ -22,6 +22,7 @@ static bool selectorFwdActive = false;
 static bool selectorBackActive = false;
 static float selectorThrottleVoltage = 0.0f;
 static uint8_t selectorThrottlePct = 0;
+static uint32_t lastAnalogLogMs = 0;
 
 static void setRgb(uint8_t r, uint8_t g, uint8_t b) {
   rgbLedWrite(RGB_PIN, r, g, b);
@@ -51,6 +52,12 @@ static float readBatteryVoltageInstant() {
   if (vBat > 20.0f) vBat = 20.0f;
   return vBat;
 }
+
+static float readBatteryAdcVoltage() {
+  const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
+  return ((float)raw * 3.3f) / 4095.0f;
+}
+
 
 static int readManualThrottlePct() {
   const int raw = readAdcAvg(PIN_MANUAL_THROTTLE, 6);
@@ -267,6 +274,11 @@ void controlLoop() {
   } else {
     setRgb(0, 0, 0);
   }
+  if (now - lastAnalogLogMs >= 500) {
+    lastAnalogLogMs = now;
+    const float battAdcV = readBatteryAdcVoltage();
+    Serial.printf("ADC_BAT=%.3fV BAT=%.2fV THR=%.3fV\n", battAdcV, batteryVoltage, selectorThrottleVoltage);
+  }
 
   steerLoop();
 }
@@ -314,5 +326,9 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
+
+
+
 
 
