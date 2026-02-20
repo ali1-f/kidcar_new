@@ -67,23 +67,36 @@ void wifiApLoop() {
     }
 
     // Always send status back to sender (even if parse fails)
-    char resp[220];
+    char resp[340];
     const int clients = WiFi.softAPgetStationNum();
-    const char* status = faultState ? "FAULT" : "OK";
     const float batt = controlGetBatteryVoltage();
     const char* mode = controlIsManualActive() ? "MANUAL" : "REMOTE";
     const int8_t manualGear = controlGetManualGear();
+    const int8_t driveDir = controlGetDriveDir();
+    const uint8_t driveSpeed = controlGetDriveSpeedPct();
+    const int selFwd = controlGetSelectorFwdActive() ? 1 : 0;
+    const int selBack = controlGetSelectorBackActive() ? 1 : 0;
+    const float selThrottleV = controlGetSelectorThrottleVoltage();
+    const uint8_t selThrottlePct = controlGetSelectorThrottlePct();
     const char* gear = "N";
     if (manualGear > 0) gear = "F";
     else if (manualGear < 0) gear = "R";
+    const char* dir = "S";
+    if (driveDir > 0) dir = "F";
+    else if (driveDir < 0) dir = "R";
     snprintf(
       resp,
       sizeof(resp),
-      "{\"ok\":1,\"status\":\"%s\",\"clients\":%d,\"mode\":\"%s\",\"manual_gear\":\"%s\",\"batt_v\":%.2f,\"ms\":%lu}",
-      status,
+      "{\"ok\":1,\"clients\":%d,\"mode\":\"%s\",\"manual_gear\":\"%s\",\"drive_dir\":\"%s\",\"drive_speed\":%u,\"sel_fwd\":%d,\"sel_back\":%d,\"sel_throttle_v\":%.3f,\"sel_throttle_pct\":%u,\"batt_v\":%.2f,\"ms\":%lu}",
       clients,
       mode,
       gear,
+      dir,
+      driveSpeed,
+      selFwd,
+      selBack,
+      selThrottleV,
+      selThrottlePct,
       batt,
       millis());
     Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());

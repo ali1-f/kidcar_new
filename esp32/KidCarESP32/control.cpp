@@ -20,6 +20,12 @@ static const uint32_t RELAY_DELAY_MS = 100;
 static float batteryVoltage = 12.0f;
 static bool manualActive = false;
 static int8_t manualGear = 0; // -1 reverse, 0 neutral, 1 forward
+static int8_t driveDir = 0;    // -1 reverse, 0 stop, 1 forward
+static uint8_t driveSpeedPct = 0; // 0..100
+static bool selectorFwdActive = false;
+static bool selectorBackActive = false;
+static float selectorThrottleVoltage = 0.0f;
+static uint8_t selectorThrottlePct = 0;
 
 static const uint8_t colors[][3] = {
   {255, 0, 0},   // red
@@ -106,12 +112,20 @@ static ControlCommand resolveDriveCommand() {
   ControlCommand cmd = lastCmd;
   manualActive = (!appConnected) || lastCmd.manualMode;
   manualGear = 0;
+  selectorFwdActive = false;
+  selectorBackActive = false;
+  selectorThrottleVoltage = 0.0f;
+  selectorThrottlePct = 0;
 
   if (manualActive) {
     const float throttleV = readManualThrottleVoltage();
+    selectorThrottleVoltage = throttleV;
     if (throttleV > 2.0f) {
       // Highest priority: if throttle input is above 2V, force full stop.
       manualGear = 0;
+      selectorFwdActive = false;
+      selectorBackActive = false;
+      selectorThrottlePct = 0;
       cmd.throttle = 0;
       cmd.steer = 0;
       cmd.steerMs = STEER_MAX_MS;
@@ -121,12 +135,15 @@ static ControlCommand resolveDriveCommand() {
 
     const bool fwd = digitalRead(PIN_MANUAL_FWD) == LOW;   // active-low
     const bool back = digitalRead(PIN_MANUAL_BACK) == LOW; // active-low
+    selectorFwdActive = fwd;
+    selectorBackActive = back;
 
     int dir = 0;
     if (fwd && !back) dir = 1;
     if (back && !fwd) dir = -1;
 
     int pct = readManualThrottlePct();
+    selectorThrottlePct = (uint8_t)pct;
     // Keep full stop when throttle voltage commands 0%.
     // Soft-start minimum applies only for non-zero throttle requests.
     if (dir != 0 && pct > 0 && pct < REAR_SOFTSTART_MIN_PCT) {
@@ -168,6 +185,13 @@ void controlLoop() {
   batteryVoltage = (batteryVoltage * 0.85f) + (instantBattery * 0.15f);
 
   const ControlCommand cmd = resolveDriveCommand();
+  if (cmd.throttle > 0) driveDir = 1;
+  else if (cmd.throttle < 0) driveDir = -1;
+  else driveDir = 0;
+  int absThrottle = cmd.throttle;
+  if (absThrottle < 0) absThrottle = -absThrottle;
+  if (absThrottle > 100) absThrottle = 100;
+  driveSpeedPct = (uint8_t)absThrottle;
   const bool wantMotion = (cmd.throttle != 0) || (cmd.steer != 0);
 
   if (manualActive) {
@@ -264,4 +288,28 @@ bool controlIsManualActive() {
 
 int8_t controlGetManualGear() {
   return manualGear;
+}
+
+int8_t controlGetDriveDir() {
+  return driveDir;
+}
+
+uint8_t controlGetDriveSpeedPct() {
+  return driveSpeedPct;
+}
+
+bool controlGetSelectorFwdActive() {
+  return selectorFwdActive;
+}
+
+bool controlGetSelectorBackActive() {
+  return selectorBackActive;
+}
+
+float controlGetSelectorThrottleVoltage() {
+  return selectorThrottleVoltage;
+}
+
+uint8_t controlGetSelectorThrottlePct() {
+  return selectorThrottlePct;
 }

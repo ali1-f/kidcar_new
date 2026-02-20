@@ -280,7 +280,12 @@ class _ControlScreenState extends State<ControlScreen>
   int _signal = 66; // updated from Wi-Fi RSSI
   bool _connected = false;
   DateTime _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
-  String _espStatus = 'CHECKING';
+  String _driveDir = 'S';
+  int _driveSpeedPct = 0;
+  int _selFwd = 0;
+  int _selBack = 0;
+  double _selThrottleV = 0.0;
+  int _selThrottlePct = 0;
   InternetAddress? _espAddress;
   int _txCount = 0;
   DateTime _lastTx = DateTime.fromMillisecondsSinceEpoch(0);
@@ -356,7 +361,6 @@ class _ControlScreenState extends State<ControlScreen>
       setState(() {
         _connected = false;
         _signal = 0;
-        _espStatus = 'CHECKING';
       });
     }
     await _udp.reset();
@@ -424,22 +428,34 @@ class _ControlScreenState extends State<ControlScreen>
       final obj = jsonDecode(data);
       if (obj is Map && obj['ok'] == 1) {
         _lastAck = DateTime.now();
-        final status = (obj['status'] ?? 'OK').toString().toUpperCase();
         final mode = (obj['mode'] ?? '').toString().toUpperCase();
         final manualGear = (obj['manual_gear'] ?? 'N').toString().toUpperCase();
+        final driveDir = (obj['drive_dir'] ?? 'S').toString().toUpperCase();
+        final int driveSpeed = ((obj['drive_speed'] ?? 0) as num?)?.toInt() ?? 0;
+        final int selFwd = ((obj['sel_fwd'] ?? 0) as num?)?.toInt() ?? 0;
+        final int selBack = ((obj['sel_back'] ?? 0) as num?)?.toInt() ?? 0;
+        final double selThrottleV =
+            ((obj['sel_throttle_v'] ?? 0.0) as num?)?.toDouble() ?? 0.0;
+        final int selThrottlePct =
+            ((obj['sel_throttle_pct'] ?? 0) as num?)?.toInt() ?? 0;
         final dynamic battRaw = obj['batt_v'];
         final double? battV = battRaw is num
             ? battRaw.toDouble()
             : double.tryParse(battRaw?.toString() ?? '');
 
-        if (!_connected || _signal < 80 || _espStatus != status) {
+        if (!_connected || _signal < 80) {
           setState(() {
             _connected = true;
             _signal = 80;
-            _espStatus = status;
             if (mode == 'MANUAL') _manualMode = true;
             if (mode == 'REMOTE') _manualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+            _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
+            _driveSpeedPct = driveSpeed.clamp(0, 100);
+            _selFwd = (selFwd != 0) ? 1 : 0;
+            _selBack = (selBack != 0) ? 1 : 0;
+            _selThrottleV = selThrottleV;
+            _selThrottlePct = selThrottlePct.clamp(0, 100);
             if (battV != null) _batteryVoltage = battV;
             _espAddress = address;
           });
@@ -454,6 +470,12 @@ class _ControlScreenState extends State<ControlScreen>
             if (mode == 'MANUAL') _manualMode = true;
             if (mode == 'REMOTE') _manualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+            _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
+            _driveSpeedPct = driveSpeed.clamp(0, 100);
+            _selFwd = (selFwd != 0) ? 1 : 0;
+            _selBack = (selBack != 0) ? 1 : 0;
+            _selThrottleV = selThrottleV;
+            _selThrottlePct = selThrottlePct.clamp(0, 100);
           });
         }
       }
@@ -525,7 +547,6 @@ class _ControlScreenState extends State<ControlScreen>
       setState(() {
         _connected = isConnected;
         if (!isConnected) _signal = 0;
-        if (!isConnected) _espStatus = 'CHECKING';
       });
       if (!isConnected) {
         _startConnectProbe();
@@ -911,13 +932,14 @@ class _ControlScreenState extends State<ControlScreen>
                   signal: _signal,
                   connected: _connected,
                   connectedLabel: _connected ? t('connected') : t('disconnected'),
-                  espStatusLabel: _espStatus == 'OK'
-                      ? t('ok')
-                      : _espStatus == 'FAULT'
-                      ? t('fault')
-                      : t('checking'),
                   manualMode: _manualMode,
                   manualGear: _manualGear,
+                  driveDir: _driveDir,
+                  driveSpeedPct: _driveSpeedPct,
+                  selectorFwd: _selFwd,
+                  selectorBack: _selBack,
+                  selectorThrottleV: _selThrottleV,
+                  selectorThrottlePct: _selThrottlePct,
                   lang: widget.lang,
                   now: _now,
                   onChangeLanguage: widget.onChangeLanguage,
@@ -1037,9 +1059,14 @@ class StatusBarWidget extends StatelessWidget {
     required this.signal,
     required this.connected,
     required this.connectedLabel,
-    required this.espStatusLabel,
     required this.manualMode,
     required this.manualGear,
+    required this.driveDir,
+    required this.driveSpeedPct,
+    required this.selectorFwd,
+    required this.selectorBack,
+    required this.selectorThrottleV,
+    required this.selectorThrottlePct,
     required this.lang,
     required this.now,
     required this.onChangeLanguage,
@@ -1053,9 +1080,14 @@ class StatusBarWidget extends StatelessWidget {
   final int signal;
   final bool connected;
   final String connectedLabel;
-  final String espStatusLabel;
   final bool manualMode;
   final String manualGear;
+  final String driveDir;
+  final int driveSpeedPct;
+  final int selectorFwd;
+  final int selectorBack;
+  final double selectorThrottleV;
+  final int selectorThrottlePct;
   final AppLang lang;
   final DateTime now;
   final VoidCallback onChangeLanguage;
@@ -1092,18 +1124,9 @@ class StatusBarWidget extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 10),
           Text(
-            (lang == AppLang.fa) ? 'وضعیت:' : 'Status:',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            espStatusLabel,
+            manualMode ? 'M:$manualGear' : 'M:-',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
@@ -1112,10 +1135,19 @@ class StatusBarWidget extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            manualMode ? 'M:$manualGear' : 'M:-',
+            'D:$driveDir ${driveSpeedPct.toString()}%',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'SF:$selectorFwd SB:$selectorBack T:${selectorThrottleV.toStringAsFixed(2)}V/${selectorThrottlePct.toString()}%',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1964,6 +1996,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
 
