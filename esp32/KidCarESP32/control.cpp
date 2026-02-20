@@ -212,8 +212,8 @@ void controlLoop() {
   }
 
   // RGB status blink:
-  // connected -> 500ms, disconnected -> 200ms
-  const uint32_t blinkPeriod = appConnected ? 500 : 200;
+  // connected -> 500ms, disconnected -> 150ms
+  const uint32_t blinkPeriod = appConnected ? 500 : 150;
   if (now - lastBlink >= blinkPeriod) {
     lastBlink = now;
     blinkOn = !blinkOn;
