@@ -1820,87 +1820,145 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late double _accelSec;
   late double _reverseSpeed;
   late double _dangerBatteryVolt;
+  late final TextEditingController _dangerController;
 
   @override
   void initState() {
     super.initState();
     _accelSec = (widget.accelMs / 1000.0).clamp(0.1, 5.0);
     _reverseSpeed = widget.reverseSpeed.toDouble().clamp(0.0, 100.0);
-    _dangerBatteryVolt = widget.dangerBatteryVolt.clamp(10.5, 12.5);
+    _dangerBatteryVolt = widget.dangerBatteryVolt;
+    _dangerController = TextEditingController(
+      text: _dangerBatteryVolt.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _dangerController.dispose();
+    super.dispose();
+  }
+
+  _SettingsResult _result() {
+    return _SettingsResult(
+      accelMs: (_accelSec * 1000).round(),
+      reverseSpeed: _reverseSpeed.round(),
+      dangerBatteryVolt: _dangerBatteryVolt,
+    );
+  }
+
+  Widget _card({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: child,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.t('settings')),
-        backgroundColor: const Color(0xFF0B6E8E),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${widget.t('accel_time')}: ${_accelSec.toStringAsFixed(1)}s',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            Slider(
-              value: _accelSec,
-              min: 0.1,
-              max: 5.0,
-              divisions: 49,
-              label: _accelSec.toStringAsFixed(1),
-              onChanged: (v) => setState(() => _accelSec = v),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '${widget.t('reverse_speed')}: ${_reverseSpeed.round()}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            Slider(
-              value: _reverseSpeed,
-              min: 0,
-              max: 100,
-              divisions: 100,
-              label: _reverseSpeed.round().toString(),
-              onChanged: (v) => setState(() => _reverseSpeed = v),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '${widget.t('danger_battery')}: ${_dangerBatteryVolt.toStringAsFixed(2)}V',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            Slider(
-              value: _dangerBatteryVolt,
-              min: 10.5,
-              max: 12.5,
-              divisions: 40,
-              label: _dangerBatteryVolt.toStringAsFixed(2),
-              onChanged: (v) => setState(() => _dangerBatteryVolt = v),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(
-                    _SettingsResult(
-                      accelMs: (_accelSec * 1000).round(),
-                      reverseSpeed: _reverseSpeed.round(),
-                      dangerBatteryVolt: _dangerBatteryVolt,
+    return PopScope<_SettingsResult>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pop(_result());
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: () => Navigator.of(context).pop(_result()),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          title: Text(widget.t('settings')),
+          backgroundColor: const Color(0xFF0B6E8E),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(12),
+          child: GridView.count(
+            crossAxisCount: 4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.35,
+            children: [
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${widget.t('accel_time')}\n${_accelSec.toStringAsFixed(1)}s',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0B6E8E),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(48),
+                    const Spacer(),
+                    Slider(
+                      value: _accelSec,
+                      min: 0.1,
+                      max: 5.0,
+                      divisions: 49,
+                      label: _accelSec.toStringAsFixed(1),
+                      onChanged: (v) => setState(() => _accelSec = v),
+                    ),
+                  ],
                 ),
-                child: Text(widget.t('save')),
               ),
-            ),
-          ],
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${widget.t('reverse_speed')}\n${_reverseSpeed.round()}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    Slider(
+                      value: _reverseSpeed,
+                      min: 0,
+                      max: 100,
+                      divisions: 100,
+                      label: _reverseSpeed.round().toString(),
+                      onChanged: (v) => setState(() => _reverseSpeed = v),
+                    ),
+                  ],
+                ),
+              ),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.t('danger_battery'),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _dangerController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 10.80',
+                        isDense: true,
+                      ),
+                      onChanged: (v) {
+                        final parsed = double.tryParse(v);
+                        if (parsed != null) {
+                          _dangerBatteryVolt = parsed;
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              _card(child: const SizedBox.shrink()),
+              _card(child: const SizedBox.shrink()),
+              _card(child: const SizedBox.shrink()),
+              _card(child: const SizedBox.shrink()),
+              _card(child: const SizedBox.shrink()),
+            ],
+          ),
         ),
       ),
     );
