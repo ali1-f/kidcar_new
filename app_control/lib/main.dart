@@ -300,8 +300,8 @@ class _ControlScreenState extends State<ControlScreen>
 
   bool get _isMobilePlatform {
     if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS;
+    return Platform.isAndroid || Platform.isIOS;
+
   }
 
   late final UdpSender _udp = UdpSender(
