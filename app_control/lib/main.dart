@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -39,10 +40,31 @@ class KidCarApp extends StatefulWidget {
 
 class _KidCarAppState extends State<KidCarApp> {
   AppLang? _lang;
+  bool _langReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLang();
+  }
+
+  Future<void> _loadLang() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('kidcar_app_lang');
+    if (!mounted) return;
+    setState(() {
+      if (saved == 'fa') _lang = AppLang.fa;
+      if (saved == 'en') _lang = AppLang.en;
+      _langReady = true;
+    });
+  }
 
   void _selectLang(AppLang lang) {
     setState(() {
       _lang = lang;
+    });
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('kidcar_app_lang', lang == AppLang.fa ? 'fa' : 'en');
     });
   }
 
@@ -50,10 +72,22 @@ class _KidCarAppState extends State<KidCarApp> {
     setState(() {
       _lang = null;
     });
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('kidcar_app_lang');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_langReady) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     final lang = _lang;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -70,7 +104,6 @@ class _KidCarAppState extends State<KidCarApp> {
         ),
       ),
       builder: (context, child) {
-        // Keep physical layout identical in both languages; only labels change.
         const direction = TextDirection.ltr;
         return Directionality(
           textDirection: direction,
@@ -282,12 +315,6 @@ class _ControlScreenState extends State<ControlScreen>
   int _signal = 66; // updated from Wi-Fi RSSI
   bool _connected = false;
   DateTime _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
-  String _driveDir = 'S';
-  int _driveSpeedPct = 0;
-  int _selFwd = 0;
-  int _selBack = 0;
-  double _selThrottleV = 0.0;
-  int _selThrottlePct = 0;
   InternetAddress? _espAddress;
   int _txCount = 0;
   DateTime _lastTx = DateTime.fromMillisecondsSinceEpoch(0);
@@ -297,6 +324,12 @@ class _ControlScreenState extends State<ControlScreen>
   Timer? _heartbeatTimer;
   final Set<LogicalKeyboardKey> _keysDown = <LogicalKeyboardKey>{};
   final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'kidcar_keyboard');
+  static const String _kSpeedKey = 'kidcar_speed';
+  static const String _kReverseSpeedKey = 'kidcar_reverse_speed';
+  static const String _kAccelMsKey = 'kidcar_accel_ms';
+  static const String _kDangerVoltKey = 'kidcar_danger_v';
+  static const String _kManualModeKey = 'kidcar_manual_mode';
+  static const String _kParkedKey = 'kidcar_parked';
 
   bool get _isMobilePlatform {
     if (kIsWeb) return false;
@@ -317,6 +350,7 @@ class _ControlScreenState extends State<ControlScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
     _requestIgnoreBatteryOptimizations();
+    _loadPersistedControls();
     _udp.init();
     _startConnectProbe();
     _sendState();
@@ -331,6 +365,31 @@ class _ControlScreenState extends State<ControlScreen>
         _keyboardFocusNode.requestFocus();
       }
     });
+  }
+
+  Future<void> _loadPersistedControls() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _speed = (prefs.getInt(_kSpeedKey) ?? _speed).clamp(_minSpeed, 100);
+      _reverseSpeed =
+          (prefs.getInt(_kReverseSpeedKey) ?? _reverseSpeed).clamp(0, 100);
+      _accelMs = (prefs.getInt(_kAccelMsKey) ?? _accelMs).clamp(100, 5000);
+      _dangerBatteryVolt = prefs.getDouble(_kDangerVoltKey) ?? _dangerBatteryVolt;
+      _manualMode = prefs.getBool(_kManualModeKey) ?? _manualMode;
+      _parked = prefs.getBool(_kParkedKey) ?? _parked;
+    });
+    _applyMotion();
+  }
+
+  Future<void> _persistControls() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kSpeedKey, _speed);
+    await prefs.setInt(_kReverseSpeedKey, _reverseSpeed);
+    await prefs.setInt(_kAccelMsKey, _accelMs);
+    await prefs.setDouble(_kDangerVoltKey, _dangerBatteryVolt);
+    await prefs.setBool(_kManualModeKey, _manualMode);
+    await prefs.setBool(_kParkedKey, _parked);
   }
 
   Future<void> _requestIgnoreBatteryOptimizations() async {
@@ -438,14 +497,6 @@ class _ControlScreenState extends State<ControlScreen>
         _lastAck = DateTime.now();
         final mode = (obj['mode'] ?? '').toString().toUpperCase();
         final manualGear = (obj['manual_gear'] ?? 'N').toString().toUpperCase();
-        final driveDir = (obj['drive_dir'] ?? 'S').toString().toUpperCase();
-        final int driveSpeed = ((obj['drive_speed'] ?? 0) as num?)?.toInt() ?? 0;
-        final int selFwd = ((obj['sel_fwd'] ?? 0) as num?)?.toInt() ?? 0;
-        final int selBack = ((obj['sel_back'] ?? 0) as num?)?.toInt() ?? 0;
-        final double selThrottleV =
-            ((obj['sel_throttle_v'] ?? 0.0) as num?)?.toDouble() ?? 0.0;
-        final int selThrottlePct =
-            ((obj['sel_throttle_pct'] ?? 0) as num?)?.toInt() ?? 0;
         final dynamic battRaw = obj['batt_v'];
         final double? battV = battRaw is num
             ? battRaw.toDouble()
@@ -458,12 +509,6 @@ class _ControlScreenState extends State<ControlScreen>
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
-            _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
-            _driveSpeedPct = driveSpeed.clamp(0, 100);
-            _selFwd = (selFwd != 0) ? 1 : 0;
-            _selBack = (selBack != 0) ? 1 : 0;
-            _selThrottleV = selThrottleV;
-            _selThrottlePct = selThrottlePct.clamp(0, 100);
             if (battV != null) _batteryVoltage = battV;
             _espAddress = address;
           });
@@ -478,12 +523,6 @@ class _ControlScreenState extends State<ControlScreen>
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
-            _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
-            _driveSpeedPct = driveSpeed.clamp(0, 100);
-            _selFwd = (selFwd != 0) ? 1 : 0;
-            _selBack = (selBack != 0) ? 1 : 0;
-            _selThrottleV = selThrottleV;
-            _selThrottlePct = selThrottlePct.clamp(0, 100);
           });
         }
       }
@@ -806,6 +845,7 @@ class _ControlScreenState extends State<ControlScreen>
     _gyroSub?.cancel();
     _gyroSub = null;
     _applyMotion();
+    _persistControls();
   }
 
   void _togglePark() {
@@ -824,6 +864,7 @@ class _ControlScreenState extends State<ControlScreen>
     } else {
       _sendState();
     }
+    _persistControls();
   }
 
   void _increaseSpeed() {
@@ -831,6 +872,7 @@ class _ControlScreenState extends State<ControlScreen>
     if (next == _speed) return;
     setState(() => _speed = next);
     _sendState();
+    _persistControls();
   }
 
   void _decreaseSpeed() {
@@ -838,6 +880,7 @@ class _ControlScreenState extends State<ControlScreen>
     if (next == _speed) return;
     setState(() => _speed = next);
     _sendState();
+    _persistControls();
   }
 
   Future<void> _openSettings() async {
@@ -859,6 +902,7 @@ class _ControlScreenState extends State<ControlScreen>
       _dangerBatteryVolt = result.dangerBatteryVolt;
     });
     _applyMotion();
+    _persistControls();
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -943,12 +987,6 @@ class _ControlScreenState extends State<ControlScreen>
                   connectedLabel: _connected ? t('connected') : t('disconnected'),
                   manualMode: _espManualMode,
                   manualGear: _manualGear,
-                  driveDir: _driveDir,
-                  driveSpeedPct: _driveSpeedPct,
-                  selectorFwd: _selFwd,
-                  selectorBack: _selBack,
-                  selectorThrottleV: _selThrottleV,
-                  selectorThrottlePct: _selThrottlePct,
                   lang: widget.lang,
                   now: _now,
                   onChangeLanguage: widget.onChangeLanguage,
@@ -1016,6 +1054,7 @@ class _ControlScreenState extends State<ControlScreen>
                             onSpeedChanged: (v) {
                               setState(() => _speed = v);
                               _sendState();
+                              _persistControls();
                             },
                             parked: _parked,
                             parkBlink: _parkBlinkOn,
@@ -1032,6 +1071,7 @@ class _ControlScreenState extends State<ControlScreen>
                             onModeChanged: (isManual) {
                               setState(() => _manualMode = isManual);
                               _sendState();
+                              _persistControls();
                             },
                           ),
                         ),
@@ -1072,12 +1112,6 @@ class StatusBarWidget extends StatelessWidget {
     required this.connectedLabel,
     required this.manualMode,
     required this.manualGear,
-    required this.driveDir,
-    required this.driveSpeedPct,
-    required this.selectorFwd,
-    required this.selectorBack,
-    required this.selectorThrottleV,
-    required this.selectorThrottlePct,
     required this.lang,
     required this.now,
     required this.onChangeLanguage,
@@ -1093,12 +1127,6 @@ class StatusBarWidget extends StatelessWidget {
   final String connectedLabel;
   final bool manualMode;
   final String manualGear;
-  final String driveDir;
-  final int driveSpeedPct;
-  final int selectorFwd;
-  final int selectorBack;
-  final double selectorThrottleV;
-  final int selectorThrottlePct;
   final AppLang lang;
   final DateTime now;
   final VoidCallback onChangeLanguage;
@@ -1141,24 +1169,6 @@ class StatusBarWidget extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'D:$driveDir ${driveSpeedPct.toString()}%',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'SF:$selectorFwd SB:$selectorBack T:${selectorThrottleV.toStringAsFixed(2)}V/${selectorThrottlePct.toString()}%',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1210,7 +1220,7 @@ class StatusBarWidget extends StatelessWidget {
           IconButton(
             onPressed: onChangeLanguage,
             icon: const Icon(Icons.translate, color: Colors.white),
-            tooltip: (lang == AppLang.fa) ? 'زبان' : 'Language',
+            tooltip: (lang == AppLang.fa) ? '????' : 'Language',
           ),
         ],
       ),
@@ -1229,7 +1239,6 @@ class StatusBarWidget extends StatelessWidget {
     return Icons.wifi;
   }
 }
-
 class BatteryIcon extends StatelessWidget {
   const BatteryIcon({
     super.key,
@@ -1962,7 +1971,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late double _reverseSpeed;
   late double _dangerBatteryVolt;
   late final TextEditingController _dangerController;
-
   @override
   void initState() {
     super.initState();
@@ -1973,13 +1981,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       text: _dangerBatteryVolt.toStringAsFixed(2),
     );
   }
-
   @override
   void dispose() {
     _dangerController.dispose();
     super.dispose();
   }
-
   _SettingsResult _result() {
     return _SettingsResult(
       accelMs: (_accelSec * 1000).round(),
@@ -1987,19 +1993,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
       dangerBatteryVolt: _dangerBatteryVolt,
     );
   }
-
   Widget _card({required Widget child}) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: child,
     );
   }
-
+  Widget _sliderCard({
+    required String title,
+    required String valueText,
+    required double value,
+    required double min,
+    required double max,
+    required int? divisions,
+    required ValueChanged<double> onChanged,
+    Widget? trailing,
+  }) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  valueText,
+                  style: const TextStyle(
+                    color: Color(0xFF0B6E8E),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 6),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return PopScope<_SettingsResult>(
@@ -2020,92 +2080,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         body: Padding(
           padding: const EdgeInsets.all(12),
-          child: GridView.count(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.35,
-            children: [
-              _card(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 820),
+              child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${widget.t('accel_time')}\n${_accelSec.toStringAsFixed(1)}s',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    Slider(
+                    _sliderCard(
+                      title: widget.t('accel_time'),
+                      valueText: '${_accelSec.toStringAsFixed(1)} s',
                       value: _accelSec,
                       min: 0.1,
                       max: 5.0,
                       divisions: 49,
-                      label: _accelSec.toStringAsFixed(1),
                       onChanged: (v) => setState(() => _accelSec = v),
                     ),
-                  ],
-                ),
-              ),
-              _card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${widget.t('reverse_speed')}\n${_reverseSpeed.round()}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const Spacer(),
-                    Slider(
+                    const SizedBox(height: 10),
+                    _sliderCard(
+                      title: widget.t('reverse_speed'),
+                      valueText: '${_reverseSpeed.round()} %',
                       value: _reverseSpeed,
                       min: 0,
                       max: 100,
                       divisions: 100,
-                      label: _reverseSpeed.round().toString(),
                       onChanged: (v) => setState(() => _reverseSpeed = v),
                     ),
-                  ],
-                ),
-              ),
-              _card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.t('danger_battery'),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _dangerController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'e.g. 10.80',
-                        isDense: true,
-                      ),
+                    const SizedBox(height: 10),
+                    _sliderCard(
+                      title: widget.t('danger_battery'),
+                      valueText: '${_dangerBatteryVolt.toStringAsFixed(2)} V',
+                      value: _dangerBatteryVolt.clamp(8.0, 15.0),
+                      min: 8.0,
+                      max: 15.0,
+                      divisions: 140,
                       onChanged: (v) {
-                        final parsed = double.tryParse(v);
-                        if (parsed != null) {
-                          _dangerBatteryVolt = parsed;
-                        }
+                        setState(() {
+                          _dangerBatteryVolt = v;
+                          _dangerController.text = v.toStringAsFixed(2);
+                        });
                       },
+                      trailing: SizedBox(
+                        width: 120,
+                        child: TextField(
+                          controller: _dangerController,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.center,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: '10.80',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                          ),
+                          onChanged: (v) {
+                            final parsed = double.tryParse(v);
+                            if (parsed != null) {
+                              setState(() => _dangerBatteryVolt = parsed);
+                            }
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              _card(child: const SizedBox.shrink()),
-              _card(child: const SizedBox.shrink()),
-              _card(child: const SizedBox.shrink()),
-              _card(child: const SizedBox.shrink()),
-              _card(child: const SizedBox.shrink()),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
 
 
 
