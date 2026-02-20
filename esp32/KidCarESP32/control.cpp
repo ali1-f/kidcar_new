@@ -6,10 +6,6 @@
 #include <Arduino.h>
 
 static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false};
-static uint8_t colorIndex = 0;
-static int lastStepInput = 0;
-static uint32_t lastStepAt = 0;
-static uint8_t brightness = 128; // 0..255
 static uint32_t lastAppMs = 0;
 static bool appConnected = false;
 static uint32_t lastBlink = 0;
@@ -27,22 +23,7 @@ static bool selectorBackActive = false;
 static float selectorThrottleVoltage = 0.0f;
 static uint8_t selectorThrottlePct = 0;
 
-static const uint8_t colors[][3] = {
-  {255, 0, 0},   // red
-  {255, 128, 0}, // orange
-  {255, 255, 0}, // yellow
-  {0, 255, 0},   // green
-  {0, 255, 255}, // cyan
-  {0, 0, 255},   // blue
-  {128, 0, 255}, // purple
-};
-static const uint8_t colorCount = sizeof(colors) / sizeof(colors[0]);
-
-static void setRgb(uint8_t idx) {
-  const uint8_t* c = colors[idx % colorCount];
-  uint8_t r = (uint8_t)((c[0] * brightness) / 255);
-  uint8_t g = (uint8_t)((c[1] * brightness) / 255);
-  uint8_t b = (uint8_t)((c[2] * brightness) / 255);
+static void setRgb(uint8_t r, uint8_t g, uint8_t b) {
   rgbLedWrite(RGB_PIN, r, g, b);
 }
 
@@ -163,7 +144,7 @@ static ControlCommand resolveDriveCommand() {
 void controlInit() {
   rearSetSpeed(0);
   steerStop();
-  setRgb(colorIndex);
+  setRgb(0, 0, 0);
   lastAppMs = millis();
   setRelay(false);
   batteryVoltage = readBatteryVoltageInstant();
@@ -230,32 +211,6 @@ void controlLoop() {
     }
   }
 
-  if (cmd.speed >= 0 && cmd.speed <= 100) {
-    brightness = (uint8_t)((cmd.speed * 255) / 100);
-    if (!(manualActive == false && appConnected == false && blinkOn)) {
-      setRgb(colorIndex);
-    }
-  }
-
-  int stepInput = 0;
-  if (cmd.throttle > 0) stepInput = 1;
-  if (cmd.throttle < 0) stepInput = -1;
-  if (stepInput == 0 && cmd.steer > 0) stepInput = 1;
-  if (stepInput == 0 && cmd.steer < 0) stepInput = -1;
-
-  if (stepInput != 0 && stepInput != lastStepInput && (now - lastStepAt) > 150) {
-    if (stepInput > 0) {
-      colorIndex = (colorIndex + 1) % colorCount;
-    } else {
-      colorIndex = (colorIndex + colorCount - 1) % colorCount;
-    }
-    if (!(manualActive == false && appConnected == false && blinkOn)) {
-      setRgb(colorIndex);
-    }
-    lastStepAt = now;
-  }
-  lastStepInput = stepInput;
-
   // RGB status blink:
   // connected -> 500ms, disconnected -> 200ms
   const uint32_t blinkPeriod = appConnected ? 500 : 200;
@@ -264,13 +219,23 @@ void controlLoop() {
     blinkOn = !blinkOn;
   }
   if (blinkOn) {
-    if (appConnected) {
-      setRgb(colorIndex);
+    if (driveSpeedPct == 0) {
+      // Stopped: solid red during ON phase
+      setRgb(255, 0, 0);
     } else {
-      rgbLedWrite(RGB_PIN, 64, 0, 0);
+      // Moving: brightness follows speed, color follows direction
+      uint8_t v = (uint8_t)((driveSpeedPct * 255) / 100);
+      if (v < 20) v = 20;
+      if (driveDir > 0) {
+        setRgb(0, v, 0);    // forward: green
+      } else if (driveDir < 0) {
+        setRgb(0, 0, v);    // reverse: blue
+      } else {
+        setRgb(255, 0, 0);  // fallback
+      }
     }
   } else {
-    rgbLedWrite(RGB_PIN, 0, 0, 0);
+    setRgb(0, 0, 0);
   }
 
   steerLoop();
@@ -280,8 +245,7 @@ void controlNotifyAppActivity() {
   lastAppMs = millis();
   if (!appConnected) {
     appConnected = true;
-    blinkOn = false;
-    setRgb(colorIndex);
+    // Keep blink phase continuous; blink timing controls LED visibility.
   }
 }
 
