@@ -276,6 +276,7 @@ class _ControlScreenState extends State<ControlScreen>
   double _batteryVoltage = 12.00;
   double _dangerBatteryVolt = 10.8;
   bool _manualMode = false;
+  bool _espManualMode = false;
   String _manualGear = 'N';
   int _signal = 66; // updated from Wi-Fi RSSI
   bool _connected = false;
@@ -447,8 +448,8 @@ class _ControlScreenState extends State<ControlScreen>
           setState(() {
             _connected = true;
             _signal = 80;
-            if (mode == 'MANUAL') _manualMode = true;
-            if (mode == 'REMOTE') _manualMode = false;
+            if (mode == 'MANUAL') _espManualMode = true;
+            if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
             _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
             _driveSpeedPct = driveSpeed.clamp(0, 100);
@@ -467,8 +468,8 @@ class _ControlScreenState extends State<ControlScreen>
         } else if (battV != null || mode.isNotEmpty) {
           setState(() {
             if (battV != null) _batteryVoltage = battV;
-            if (mode == 'MANUAL') _manualMode = true;
-            if (mode == 'REMOTE') _manualMode = false;
+            if (mode == 'MANUAL') _espManualMode = true;
+            if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
             _driveDir = (driveDir == 'F' || driveDir == 'R') ? driveDir : 'S';
             _driveSpeedPct = driveSpeed.clamp(0, 100);
@@ -932,7 +933,7 @@ class _ControlScreenState extends State<ControlScreen>
                   signal: _signal,
                   connected: _connected,
                   connectedLabel: _connected ? t('connected') : t('disconnected'),
-                  manualMode: _manualMode,
+                  manualMode: _espManualMode,
                   manualGear: _manualGear,
                   driveDir: _driveDir,
                   driveSpeedPct: _driveSpeedPct,
@@ -1016,10 +1017,11 @@ class _ControlScreenState extends State<ControlScreen>
                                 ? t('drive_locked')
                                 : t('drive_unlocked'),
                             modeTitle: t('mode'),
-                            controlModeLabel: _manualMode ? t('manual') : t('remote'),
-                            fnLabel: t('fn'),
-                            onModeToggle: () {
-                              setState(() => _manualMode = !_manualMode);
+                            remoteLabel: t('remote'),
+                            manualLabel: t('manual'),
+                            selectedManualMode: _manualMode,
+                            onModeChanged: (isManual) {
+                              setState(() => _manualMode = isManual);
                               _sendState();
                             },
                           ),
@@ -1605,9 +1607,10 @@ class CenterPanel extends StatelessWidget {
     required this.parkHint,
     required this.statusText,
     required this.modeTitle,
-    required this.controlModeLabel,
-    required this.fnLabel,
-    required this.onModeToggle,
+    required this.remoteLabel,
+    required this.manualLabel,
+    required this.selectedManualMode,
+    required this.onModeChanged,
   });
 
   final int speed;
@@ -1620,9 +1623,10 @@ class CenterPanel extends StatelessWidget {
   final String parkHint;
   final String statusText;
   final String modeTitle;
-  final String controlModeLabel;
-  final String fnLabel;
-  final VoidCallback onModeToggle;
+  final String remoteLabel;
+  final String manualLabel;
+  final bool selectedManualMode;
+  final ValueChanged<bool> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1656,16 +1660,12 @@ class CenterPanel extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            OutlinedButton(
-              onPressed: onModeToggle,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF0B6E8E),
-                side: const BorderSide(color: Color(0xFF0B6E8E), width: 1.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('$fnLabel: $modeTitle $controlModeLabel'),
+            ModeSlideToggle(
+              title: modeTitle,
+              leftLabel: remoteLabel,
+              rightLabel: manualLabel,
+              manualSelected: selectedManualMode,
+              onChanged: onModeChanged,
             ),
             const SizedBox(height: 8),
             SpeedGauge(speed: speed, width: gaugeWidth, height: gaugeHeight),
@@ -1735,6 +1735,106 @@ class CenterPanel extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class ModeSlideToggle extends StatelessWidget {
+  const ModeSlideToggle({
+    super.key,
+    required this.title,
+    required this.leftLabel,
+    required this.rightLabel,
+    required this.manualSelected,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String leftLabel;
+  final String rightLabel;
+  final bool manualSelected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF0B6E8E),
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => onChanged(!manualSelected),
+          child: Container(
+            width: 216,
+            height: 44,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1F5),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF87A7B6), width: 1),
+            ),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  alignment: manualSelected
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    width: 104,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: manualSelected
+                          ? const Color(0xFF0B6E8E)
+                          : const Color(0xFF1E8FB0),
+                      borderRadius: BorderRadius.circular(21),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          leftLabel,
+                          style: TextStyle(
+                            color: manualSelected
+                                ? const Color(0xFF4C6470)
+                                : Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          rightLabel,
+                          style: TextStyle(
+                            color: manualSelected
+                                ? Colors.white
+                                : const Color(0xFF4C6470),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
