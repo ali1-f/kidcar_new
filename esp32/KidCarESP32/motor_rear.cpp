@@ -3,11 +3,19 @@
 #include "config.h"
 #include <Arduino.h>
 
+static uint16_t gRearRampMs = REAR_RAMP_MS;
+
 static int toDuty(int pct) {
   if (pct < 0) pct = -pct;
   if (pct > 100) pct = 100;
   int maxDuty = (1 << PWM_RES) - 1;
   return map(pct, 0, 100, 0, maxDuty);
+}
+
+void rearSetRampMs(uint16_t rampMs) {
+  if (rampMs < 100) rampMs = 100;
+  if (rampMs > 5000) rampMs = 5000;
+  gRearRampMs = rampMs;
 }
 
 void rearSetSpeed(int speed) {
@@ -43,13 +51,13 @@ void rearSetSpeed(int speed) {
 
   if (currentDuty < targetDuty) {
     int maxDuty = (1 << PWM_RES) - 1;
-    int step = (int)((maxDuty * (uint32_t)dt) / (uint32_t)REAR_RAMP_MS);
+    int step = (int)((maxDuty * (uint32_t)dt) / (uint32_t)gRearRampMs);
     if (step < 1) step = 1;
     currentDuty += step;
     if (currentDuty > targetDuty) currentDuty = targetDuty;
   } else if (currentDuty > targetDuty) {
     int maxDuty = (1 << PWM_RES) - 1;
-    int step = (int)((maxDuty * (uint32_t)dt) / (uint32_t)REAR_RAMP_MS);
+    int step = (int)((maxDuty * (uint32_t)dt) / (uint32_t)gRearRampMs);
     if (step < 1) step = 1;
     currentDuty -= step;
     if (currentDuty < targetDuty) currentDuty = targetDuty;

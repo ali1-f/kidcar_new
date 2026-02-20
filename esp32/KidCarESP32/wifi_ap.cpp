@@ -46,35 +46,49 @@ void wifiApInit() {
 }
 
 void wifiApLoop() {
-  const uint32_t now = millis();
-
   int packetSize = Udp.parsePacket();
-  if (packetSize <= 0) return;
+  if (packetSize > 0) {
+    int len = Udp.read(packetBuffer, sizeof(packetBuffer) - 1);
+    if (len > 0) {
+      packetBuffer[len] = 0;
 
-  int len = Udp.read(packetBuffer, sizeof(packetBuffer) - 1);
-  if (len <= 0) return;
-  packetBuffer[len] = 0;
+      controlNotifyAppActivity();
+      Serial.print("RX ");
+      Serial.println(packetBuffer);
 
-  controlNotifyAppActivity();
-  Serial.print("RX ");
-  Serial.println(packetBuffer);
-
-  // Always send status back to sender (even if parse fails)
-  char resp[160];
-  int clients = WiFi.softAPgetStationNum();
-  const char* status = faultState ? "FAULT" : "OK";
-  snprintf(resp, sizeof(resp), "{\"ok\":1,\"status\":\"%s\",\"clients\":%d,\"ms\":%lu}", status, clients, millis());
-  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-  Udp.write((const uint8_t*)resp, strlen(resp));
-  Udp.endPacket();
-
-  ControlCommand cmd;
-  if (protocolParse(packetBuffer, cmd)) {
-    controlApply(cmd);
-    if (millis() - lastAckLog > 1000) {
-      lastAckLog = millis();
-      Serial.println("APP OK");
+      ControlCommand cmd;
+      if (protocolParse(packetBuffer, cmd)) {
+        controlApply(cmd);
+        if (millis() - lastAckLog > 1000) {
+          lastAckLog = millis();
+          Serial.println("APP OK");
+        }
+      }
     }
+
+    // Always send status back to sender (even if parse fails)
+    char resp[220];
+    const int clients = WiFi.softAPgetStationNum();
+    const char* status = faultState ? "FAULT" : "OK";
+    const float batt = controlGetBatteryVoltage();
+    const char* mode = controlIsManualActive() ? "MANUAL" : "REMOTE";
+    const int8_t manualGear = controlGetManualGear();
+    const char* gear = "N";
+    if (manualGear > 0) gear = "F";
+    else if (manualGear < 0) gear = "R";
+    snprintf(
+      resp,
+      sizeof(resp),
+      "{\"ok\":1,\"status\":\"%s\",\"clients\":%d,\"mode\":\"%s\",\"manual_gear\":\"%s\",\"batt_v\":%.2f,\"ms\":%lu}",
+      status,
+      clients,
+      mode,
+      gear,
+      batt,
+      millis());
+    Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+    Udp.write((const uint8_t*)resp, strlen(resp));
+    Udp.endPacket();
   }
 }
 #endif

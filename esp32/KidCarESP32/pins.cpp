@@ -12,10 +12,21 @@ void setupPins() {
   pinMode(PIN_RELAY_EN, INPUT_PULLDOWN);
   digitalWrite(PIN_RELAY_EN, LOW);
   pinMode(PIN_RELAY_EN, OUTPUT);
+
   pinMode(PIN_BTS_REN, OUTPUT);
   pinMode(PIN_BTS_LEN, OUTPUT);
   pinMode(PIN_L298_IN1, OUTPUT);
   pinMode(PIN_L298_IN2, OUTPUT);
+
+  // Manual control inputs
+  pinMode(PIN_MANUAL_FWD, INPUT);
+  pinMode(PIN_MANUAL_BACK, INPUT);
+  pinMode(PIN_MANUAL_THROTTLE, INPUT);
+  pinMode(PIN_BATTERY_FB, INPUT);
+
+  analogReadResolution(12);
+  analogSetPinAttenuation(PIN_MANUAL_THROTTLE, ADC_11db);
+  analogSetPinAttenuation(PIN_BATTERY_FB, ADC_11db);
 
   digitalWrite(PIN_RELAY_EN, LOW);
   digitalWrite(PIN_BTS_REN, HIGH);

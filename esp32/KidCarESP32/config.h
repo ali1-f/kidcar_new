@@ -17,7 +17,7 @@ static const uint16_t STEER_MAX_MS = 5000; // hard limit for steering motor run 
 static const uint8_t STEER_MAX_PWM_PCT = 60; // unused when PWM disabled
 
 // Rear motor soft-start
-static const uint8_t REAR_SOFTSTART_MIN_PCT = 10; // safe start percent
+static const uint8_t REAR_SOFTSTART_MIN_PCT = 20; // safe start percent
 static const uint16_t REAR_RAMP_MS = 600; // time to ramp to target
 
 // Network settings
@@ -27,3 +27,4 @@ static const uint16_t UDP_PORT = 4210;
 
 // RGB LED pin (common ESP32-S3 boards use 48, some use 38)
 static const int RGB_PIN = 48;
+

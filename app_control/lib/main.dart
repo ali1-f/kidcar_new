@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -124,7 +124,7 @@ class LanguageSelectScreen extends StatelessWidget {
                       runSpacing: 16,
                       children: [
                         _LangButton(
-                          label: 'فارسي',
+                          label: 'فارسی',
                           width: buttonW,
                           onTap: () => onSelect(AppLang.fa),
                         ),
@@ -252,6 +252,8 @@ class _ControlScreenState extends State<ControlScreen>
   static const MethodChannel _powerChannel = MethodChannel('kidcar/wifi');
   static const int _minSpeed = 20;
   int _speed = 50; // 20..100
+  int _reverseSpeed = 35; // 0..100 (independent from main speed slider)
+  int _accelMs = 600; // 100..5000
   int _throttle = 0; // -100..100
   int _steer = 0; // -100..100
   bool _parked = true;
@@ -271,7 +273,10 @@ class _ControlScreenState extends State<ControlScreen>
   Timer? _txTimer;
   Timer? _connectProbeTimer;
 
-  final int _battery = 78; // demo
+  double _batteryVoltage = 12.00;
+  double _dangerBatteryVolt = 10.8;
+  bool _manualMode = false;
+  String _manualGear = 'N';
   int _signal = 66; // updated from Wi-Fi RSSI
   bool _connected = false;
   DateTime _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
@@ -420,11 +425,22 @@ class _ControlScreenState extends State<ControlScreen>
       if (obj is Map && obj['ok'] == 1) {
         _lastAck = DateTime.now();
         final status = (obj['status'] ?? 'OK').toString().toUpperCase();
+        final mode = (obj['mode'] ?? '').toString().toUpperCase();
+        final manualGear = (obj['manual_gear'] ?? 'N').toString().toUpperCase();
+        final dynamic battRaw = obj['batt_v'];
+        final double? battV = battRaw is num
+            ? battRaw.toDouble()
+            : double.tryParse(battRaw?.toString() ?? '');
+
         if (!_connected || _signal < 80 || _espStatus != status) {
           setState(() {
             _connected = true;
             _signal = 80;
             _espStatus = status;
+            if (mode == 'MANUAL') _manualMode = true;
+            if (mode == 'REMOTE') _manualMode = false;
+            _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+            if (battV != null) _batteryVoltage = battV;
             _espAddress = address;
           });
           _udp.address = address;
@@ -432,6 +448,13 @@ class _ControlScreenState extends State<ControlScreen>
             _espAddress!.address != address.address) {
           _espAddress = address;
           _udp.address = address;
+        } else if (battV != null || mode.isNotEmpty) {
+          setState(() {
+            if (battV != null) _batteryVoltage = battV;
+            if (mode == 'MANUAL') _manualMode = true;
+            if (mode == 'REMOTE') _manualMode = false;
+            _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+          });
         }
       }
     } catch (_) {
@@ -444,9 +467,10 @@ class _ControlScreenState extends State<ControlScreen>
       'throttle': _throttle,
       'steer': _steer,
       'speed': _speed,
+      'accel_ms': _accelMs,
       'park': _parked,
-      'battery': _battery,
       'signal': _signal,
+      'mode': _manualMode ? 'manual' : 'remote',
     };
     if (includePing) {
       payload['ping'] = 1;
@@ -455,7 +479,6 @@ class _ControlScreenState extends State<ControlScreen>
     }
     return payload;
   }
-
   int _computeSteerWithHoldLimit() {
     if (_gyroPressed) {
       return _gyroSteer;
@@ -535,7 +558,7 @@ class _ControlScreenState extends State<ControlScreen>
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi‑Fi Network'),
+          title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network'),
           content: Text((widget.lang == AppLang.fa) ? 'نامشخص' : 'Unknown'),
           actions: [
             TextButton(
@@ -561,7 +584,7 @@ class _ControlScreenState extends State<ControlScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi‑Fi Network'),
+        title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network'),
         content: Text(name),
         actions: [
           TextButton(
@@ -589,18 +612,27 @@ class _ControlScreenState extends State<ControlScreen>
       'right': 'راست',
       'speed': 'سرعت',
       'park': 'پارک',
-      'hold_to_drive': 'براي حرکت، دکمه پارک را نگه داريد',
-      'battery': 'باتري',
+      'hold_to_drive': 'برای حرکت، دکمه پارک را نگه دارید',
+      'battery': 'باتری',
       'signal': 'آنتن',
       'drive_locked': 'حرکت قفل است',
       'drive_unlocked': 'حرکت فعال شد',
-      'app_title': 'کنترل ماشين کودک',
+      'app_title': 'کنترل ماشین کودک',
       'connected': 'متصل',
       'disconnected': 'قطع',
       'checking': 'در حال بررسی',
       'ok': 'سالم',
       'fault': 'خطا',
       'gyro': 'ژیروسکوپ',
+      'mode': 'حالت',
+      'remote': 'ریموت',
+      'manual': 'منوال',
+      'settings': 'Settings',
+      'fn': 'FN',
+      'accel_time': 'Acceleration Time',
+      'reverse_speed': 'Reverse Speed',
+      'danger_battery': 'Danger Voltage',
+      'save': 'Save',
     };
 
     const en = {
@@ -622,6 +654,15 @@ class _ControlScreenState extends State<ControlScreen>
       'ok': 'OK',
       'fault': 'Fault',
       'gyro': 'Gyroscope',
+      'mode': 'Mode',
+      'remote': 'Remote',
+      'manual': 'Manual',
+      'settings': 'Settings',
+      'fn': 'FN',
+      'accel_time': 'Acceleration Time',
+      'reverse_speed': 'Reverse Speed',
+      'danger_battery': 'Danger Voltage',
+      'save': 'Save',
     };
 
     final map = (widget.lang == AppLang.fa) ? fa : en;
@@ -631,7 +672,7 @@ class _ControlScreenState extends State<ControlScreen>
   void _applyMotion() {
     int throttle = 0;
     if (_forwardPressed && !_backPressed) throttle = _speed;
-    if (_backPressed && !_forwardPressed) throttle = -_speed;
+    if (_backPressed && !_forwardPressed) throttle = -_reverseSpeed;
     final steer = _computeSteerWithHoldLimit();
 
     setState(() {
@@ -769,6 +810,27 @@ class _ControlScreenState extends State<ControlScreen>
     _sendState();
   }
 
+  Future<void> _openSettings() async {
+    final result = await Navigator.of(context).push<_SettingsResult>(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          lang: widget.lang,
+          accelMs: _accelMs,
+          reverseSpeed: _reverseSpeed,
+          dangerBatteryVolt: _dangerBatteryVolt,
+          t: t,
+        ),
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _accelMs = result.accelMs;
+      _reverseSpeed = result.reverseSpeed;
+      _dangerBatteryVolt = result.dangerBatteryVolt;
+    });
+    _applyMotion();
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     final key = event.logicalKey;
     if (event is KeyDownEvent) {
@@ -844,7 +906,8 @@ class _ControlScreenState extends State<ControlScreen>
               children: [
                 StatusBarWidget(
                   title: t('app_title'),
-                  battery: _battery,
+                  batteryVoltage: _batteryVoltage,
+                  dangerBatteryVolt: _dangerBatteryVolt,
                   signal: _signal,
                   connected: _connected,
                   connectedLabel: _connected ? t('connected') : t('disconnected'),
@@ -853,10 +916,13 @@ class _ControlScreenState extends State<ControlScreen>
                       : _espStatus == 'FAULT'
                       ? t('fault')
                       : t('checking'),
+                  manualMode: _manualMode,
+                  manualGear: _manualGear,
                   lang: widget.lang,
                   now: _now,
                   onChangeLanguage: widget.onChangeLanguage,
                   onWifiTap: _showWifiName,
+                  onSettingsTap: _openSettings,
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -927,6 +993,13 @@ class _ControlScreenState extends State<ControlScreen>
                             statusText: _parked
                                 ? t('drive_locked')
                                 : t('drive_unlocked'),
+                            modeTitle: t('mode'),
+                            controlModeLabel: _manualMode ? t('manual') : t('remote'),
+                            fnLabel: t('fn'),
+                            onModeToggle: () {
+                              setState(() => _manualMode = !_manualMode);
+                              _sendState();
+                            },
                           ),
                         ),
                         Expanded(
@@ -959,27 +1032,35 @@ class StatusBarWidget extends StatelessWidget {
   const StatusBarWidget({
     super.key,
     required this.title,
-    required this.battery,
+    required this.batteryVoltage,
+    required this.dangerBatteryVolt,
     required this.signal,
     required this.connected,
     required this.connectedLabel,
     required this.espStatusLabel,
+    required this.manualMode,
+    required this.manualGear,
     required this.lang,
     required this.now,
     required this.onChangeLanguage,
     required this.onWifiTap,
+    required this.onSettingsTap,
   });
 
   final String title;
-  final int battery;
+  final double batteryVoltage;
+  final double dangerBatteryVolt;
   final int signal;
   final bool connected;
   final String connectedLabel;
   final String espStatusLabel;
+  final bool manualMode;
+  final String manualGear;
   final AppLang lang;
   final DateTime now;
   final VoidCallback onChangeLanguage;
   final VoidCallback onWifiTap;
+  final VoidCallback onSettingsTap;
 
   String _timeText() {
     final h = now.hour.toString().padLeft(2, '0');
@@ -1029,6 +1110,15 @@ class StatusBarWidget extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(width: 10),
+          Text(
+            manualMode ? 'M:$manualGear' : 'M:-',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Expanded(
             child: Center(
               child: Text(
@@ -1055,13 +1145,25 @@ class StatusBarWidget extends StatelessWidget {
             child: Icon(_wifiIcon(signal), color: _levelColor(signal), size: 20),
           ),
           const SizedBox(width: 12),
-          BatteryIcon(level: battery),
-          const SizedBox(width: 6),
+          BatteryIcon(
+            voltage: batteryVoltage,
+            dangerThreshold: dangerBatteryVolt,
+          ),
+          const SizedBox(width: 8),
           Text(
-            '$battery%',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            '${batteryVoltage.toStringAsFixed(2)}V',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(width: 16),
+          IconButton(
+            onPressed: onSettingsTap,
+            icon: const Icon(Icons.settings, color: Colors.white),
+            tooltip: 'Settings',
+          ),
           IconButton(
             onPressed: onChangeLanguage,
             icon: const Icon(Icons.translate, color: Colors.white),
@@ -1086,19 +1188,29 @@ class StatusBarWidget extends StatelessWidget {
 }
 
 class BatteryIcon extends StatelessWidget {
-  const BatteryIcon({super.key, required this.level});
+  const BatteryIcon({
+    super.key,
+    required this.voltage,
+    required this.dangerThreshold,
+  });
 
-  final int level;
+  final double voltage;
+  final double dangerThreshold;
 
-  Color _color(int level) {
-    if (level <= 20) return const Color(0xFFE74C3C);
-    if (level <= 50) return const Color(0xFFF1C40F);
+  Color _color(double v) {
+    final redT = dangerThreshold;
+    final orangeT = (dangerThreshold + 0.4).clamp(10.5, 13.0);
+    final yellowT = (dangerThreshold + 0.9).clamp(10.5, 13.0);
+    if (v <= redT) return const Color(0xFFE74C3C); // red
+    if (v <= orangeT) return const Color(0xFFE67E22); // orange
+    if (v <= yellowT) return const Color(0xFFF1C40F); // yellow
     return const Color(0xFF2ECC71);
   }
 
   @override
   Widget build(BuildContext context) {
-    final pct = level.clamp(0, 100);
+    final clamped = voltage.clamp(10.5, 13.0);
+    final pct = ((clamped - 10.5) / (13.0 - 10.5)) * 100.0;
     return Container(
       width: 32,
       height: 14,
@@ -1114,7 +1226,7 @@ class BatteryIcon extends StatelessWidget {
             child: Container(
               width: (pct / 100) * 26,
               decoration: BoxDecoration(
-                color: _color(pct),
+                color: _color(clamped),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1460,6 +1572,10 @@ class CenterPanel extends StatelessWidget {
     required this.parkLabel,
     required this.parkHint,
     required this.statusText,
+    required this.modeTitle,
+    required this.controlModeLabel,
+    required this.fnLabel,
+    required this.onModeToggle,
   });
 
   final int speed;
@@ -1471,6 +1587,10 @@ class CenterPanel extends StatelessWidget {
   final String parkLabel;
   final String parkHint;
   final String statusText;
+  final String modeTitle;
+  final String controlModeLabel;
+  final String fnLabel;
+  final VoidCallback onModeToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -1504,6 +1624,18 @@ class CenterPanel extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            OutlinedButton(
+              onPressed: onModeToggle,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0B6E8E),
+                side: const BorderSide(color: Color(0xFF0B6E8E), width: 1.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('$fnLabel: $modeTitle $controlModeLabel'),
+            ),
+            const SizedBox(height: 8),
             SpeedGauge(speed: speed, width: gaugeWidth, height: gaugeHeight),
             const SizedBox(height: 10),
             SizedBox(
@@ -1651,3 +1783,131 @@ class SpeedGauge extends StatelessWidget {
     );
   }
 }
+
+class _SettingsResult {
+  const _SettingsResult({
+    required this.accelMs,
+    required this.reverseSpeed,
+    required this.dangerBatteryVolt,
+  });
+
+  final int accelMs;
+  final int reverseSpeed;
+  final double dangerBatteryVolt;
+}
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({
+    super.key,
+    required this.lang,
+    required this.accelMs,
+    required this.reverseSpeed,
+    required this.dangerBatteryVolt,
+    required this.t,
+  });
+
+  final AppLang lang;
+  final int accelMs;
+  final int reverseSpeed;
+  final double dangerBatteryVolt;
+  final String Function(String key) t;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  late double _accelSec;
+  late double _reverseSpeed;
+  late double _dangerBatteryVolt;
+
+  @override
+  void initState() {
+    super.initState();
+    _accelSec = (widget.accelMs / 1000.0).clamp(0.1, 5.0);
+    _reverseSpeed = widget.reverseSpeed.toDouble().clamp(0.0, 100.0);
+    _dangerBatteryVolt = widget.dangerBatteryVolt.clamp(10.5, 12.5);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.t('settings')),
+        backgroundColor: const Color(0xFF0B6E8E),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.t('accel_time')}: ${_accelSec.toStringAsFixed(1)}s',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            Slider(
+              value: _accelSec,
+              min: 0.1,
+              max: 5.0,
+              divisions: 49,
+              label: _accelSec.toStringAsFixed(1),
+              onChanged: (v) => setState(() => _accelSec = v),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '${widget.t('reverse_speed')}: ${_reverseSpeed.round()}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            Slider(
+              value: _reverseSpeed,
+              min: 0,
+              max: 100,
+              divisions: 100,
+              label: _reverseSpeed.round().toString(),
+              onChanged: (v) => setState(() => _reverseSpeed = v),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '${widget.t('danger_battery')}: ${_dangerBatteryVolt.toStringAsFixed(2)}V',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            Slider(
+              value: _dangerBatteryVolt,
+              min: 10.5,
+              max: 12.5,
+              divisions: 40,
+              label: _dangerBatteryVolt.toStringAsFixed(2),
+              onChanged: (v) => setState(() => _dangerBatteryVolt = v),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(
+                    _SettingsResult(
+                      accelMs: (_accelSec * 1000).round(),
+                      reverseSpeed: _reverseSpeed.round(),
+                      dangerBatteryVolt: _dangerBatteryVolt,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B6E8E),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                child: Text(widget.t('save')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+
