@@ -195,7 +195,6 @@ void controlLoop() {
   const bool wantMotion = (cmd.throttle != 0) || (cmd.steer != 0);
 
   if (manualActive) {
-    blinkOn = false;
     if (wantMotion) {
       if (!relayOn) setRelay(true);
       if (relayOn && (now - relayEnabledAt) >= RELAY_DELAY_MS) {
@@ -213,15 +212,6 @@ void controlLoop() {
       setRelay(false);
       rearSetSpeed(0);
       steerStop();
-      if (now - lastBlink >= 200) {
-        lastBlink = now;
-        blinkOn = !blinkOn;
-        if (blinkOn) {
-          rgbLedWrite(RGB_PIN, 64, 0, 0);
-        } else {
-          rgbLedWrite(RGB_PIN, 0, 0, 0);
-        }
-      }
     } else if (wantMotion) {
       if (!relayOn) {
         setRelay(true);
@@ -265,6 +255,23 @@ void controlLoop() {
     lastStepAt = now;
   }
   lastStepInput = stepInput;
+
+  // RGB status blink:
+  // connected -> 500ms, disconnected -> 200ms
+  const uint32_t blinkPeriod = appConnected ? 500 : 200;
+  if (now - lastBlink >= blinkPeriod) {
+    lastBlink = now;
+    blinkOn = !blinkOn;
+  }
+  if (blinkOn) {
+    if (appConnected) {
+      setRgb(colorIndex);
+    } else {
+      rgbLedWrite(RGB_PIN, 64, 0, 0);
+    }
+  } else {
+    rgbLedWrite(RGB_PIN, 0, 0, 0);
+  }
 
   steerLoop();
 }
