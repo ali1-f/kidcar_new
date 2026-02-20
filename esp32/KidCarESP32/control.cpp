@@ -67,10 +67,15 @@ static float readBatteryVoltageInstant() {
 
 static int readManualThrottlePct() {
   const int raw = readAdcAvg(PIN_MANUAL_THROTTLE, 6);
-  int pct = map(raw, 100, 2800, 0, 100);
-  if (pct < 0) pct = 0;
-  if (pct > 100) pct = 100;
-  return pct;
+  const float v = ((float)raw * 3.3f) / 4095.0f;
+
+  // New manual throttle levels:
+  // idle ~3.0V, D2/reverse ~1.0V, D1 ~0.5V, D3 ~0.0V
+  // Map to 0/50/75/100% respectively.
+  if (v < 0.25f) return 100; // D3
+  if (v < 0.75f) return 75;  // D1
+  if (v < 1.50f) return 50;  // D2 / reverse
+  return 0;                  // idle / unknown
 }
 
 static ControlCommand resolveDriveCommand() {
@@ -79,18 +84,14 @@ static ControlCommand resolveDriveCommand() {
   manualGear = 0;
 
   if (manualActive) {
-    const bool fwd = digitalRead(PIN_MANUAL_FWD) == HIGH;
-    const bool back = digitalRead(PIN_MANUAL_BACK) == HIGH;
+    const bool fwd = digitalRead(PIN_MANUAL_FWD) == LOW;   // active-low
+    const bool back = digitalRead(PIN_MANUAL_BACK) == LOW; // active-low
 
     int dir = 0;
     if (fwd && !back) dir = 1;
     if (back && !fwd) dir = -1;
 
     int pct = readManualThrottlePct();
-    if (dir < 0) {
-      // Requirement: reverse speed in manual mode must be fixed at 50%.
-      pct = 50;
-    }
     if (dir != 0 && pct < REAR_SOFTSTART_MIN_PCT) {
       pct = REAR_SOFTSTART_MIN_PCT;
     }

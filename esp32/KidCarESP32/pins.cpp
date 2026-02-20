@@ -19,8 +19,8 @@ void setupPins() {
   pinMode(PIN_L298_IN2, OUTPUT);
 
   // Manual control inputs
-  pinMode(PIN_MANUAL_FWD, INPUT);
-  pinMode(PIN_MANUAL_BACK, INPUT);
+  pinMode(PIN_MANUAL_FWD, INPUT_PULLUP);
+  pinMode(PIN_MANUAL_BACK, INPUT_PULLUP);
   pinMode(PIN_MANUAL_THROTTLE, INPUT);
   pinMode(PIN_BATTERY_FB, INPUT);
 
