@@ -111,7 +111,9 @@ static ControlCommand resolveDriveCommand() {
     if (back && !fwd) dir = -1;
 
     int pct = readManualThrottlePct();
-    if (dir != 0 && pct < REAR_SOFTSTART_MIN_PCT) {
+    // Keep full stop when throttle voltage commands 0%.
+    // Soft-start minimum applies only for non-zero throttle requests.
+    if (dir != 0 && pct > 0 && pct < REAR_SOFTSTART_MIN_PCT) {
       pct = REAR_SOFTSTART_MIN_PCT;
     }
 
