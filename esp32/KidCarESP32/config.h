@@ -21,8 +21,8 @@ static const uint8_t REAR_SOFTSTART_MIN_PCT = 20; // safe start percent
 static const uint16_t REAR_RAMP_MS = 600; // time to ramp to target
 
 // Battery voltage calibration factor
-// Calibrated with measured values: Vbat=12.88V, Vadc=2.37V (100k/22k divider).
-static const float BATTERY_VOLT_CAL_FACTOR = 0.9771f;
+// Calibrated with measured values: meter=13.13V, app=12.65V (ratio 1.037945).
+static const float BATTERY_VOLT_CAL_FACTOR = 1.0142f;
 
 // Network settings
 static const char* AP_SSID = "KidCar";
@@ -31,6 +31,7 @@ static const uint16_t UDP_PORT = 4210;
 
 // RGB LED pin (common ESP32-S3 boards use 48, some use 38)
 static const int RGB_PIN = 48;
+
 
 
 
