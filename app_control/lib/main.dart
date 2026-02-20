@@ -1003,6 +1003,7 @@ class _ControlScreenState extends State<ControlScreen>
                     child: Row(
                       children: [
                         Expanded(
+                          flex: 11,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               const gap = 18.0;
@@ -1047,7 +1048,9 @@ class _ControlScreenState extends State<ControlScreen>
                             },
                           ),
                         ),
+                        const SizedBox(width: 14),
                         Expanded(
+                          flex: 10,
                           child: CenterPanel(
                             speed: _speed,
                             minSpeed: _minSpeed,
@@ -1075,7 +1078,9 @@ class _ControlScreenState extends State<ControlScreen>
                             },
                           ),
                         ),
+                        const SizedBox(width: 14),
                         Expanded(
+                          flex: 11,
                           child: ControlPad(
                             primaryLabel: t('forward'),
                             secondaryLabel: t('back'),
@@ -1150,79 +1155,130 @@ class StatusBarWidget extends StatelessWidget {
           BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          Text(
-            connectedLabel,
-            style: TextStyle(
-              color: connected
-                  ? const Color(0xFF2ECC71)
-                  : const Color(0xFFE74C3C),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            manualMode ? 'M:$manualGear' : 'M:-',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final sideWidth =
+              ((constraints.maxWidth - 300.0) / 2).clamp(130.0, 380.0);
+          final titleWidth =
+              (constraints.maxWidth - (2 * sideWidth)).clamp(100.0, constraints.maxWidth);
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: titleWidth,
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ),
-          Text(
-            _timeText(),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 16),
-          GestureDetector(
-            onTap: onWifiTap,
-            child: Icon(_wifiIcon(signal), color: _levelColor(signal), size: 20),
-          ),
-          const SizedBox(width: 12),
-          BatteryIcon(
-            voltage: batteryVoltage,
-            dangerThreshold: dangerBatteryVolt,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${batteryVoltage.toStringAsFixed(2)}V',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 16),
-          IconButton(
-            onPressed: onSettingsTap,
-            icon: const Icon(Icons.settings, color: Colors.white),
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            onPressed: onChangeLanguage,
-            icon: const Icon(Icons.translate, color: Colors.white),
-            tooltip: (lang == AppLang.fa) ? '????' : 'Language',
-          ),
-        ],
+              Positioned.fill(
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: sideWidth,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                connectedLabel,
+                                style: TextStyle(
+                                  color: connected
+                                      ? const Color(0xFF2ECC71)
+                                      : const Color(0xFFE74C3C),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                manualMode ? 'M:$manualGear' : 'M:-',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: sideWidth,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _timeText(),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              GestureDetector(
+                                onTap: onWifiTap,
+                                child: Icon(
+                                  _wifiIcon(signal),
+                                  color: _levelColor(signal),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              BatteryIcon(
+                                voltage: batteryVoltage,
+                                dangerThreshold: dangerBatteryVolt,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${batteryVoltage.toStringAsFixed(2)}V',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              IconButton(
+                                onPressed: onSettingsTap,
+                                icon: const Icon(Icons.settings, color: Colors.white),
+                                tooltip: 'Settings',
+                              ),
+                              IconButton(
+                                onPressed: onChangeLanguage,
+                                icon: const Icon(Icons.translate, color: Colors.white),
+                                tooltip: (lang == AppLang.fa) ? '\u0632\u0628\u0627\u0646' : 'Language',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1665,6 +1721,7 @@ class CenterPanel extends StatelessWidget {
         final sliderWidth = sliderBase < 200.0
             ? sliderBase
             : (sliderBase > 320.0 ? 320.0 : sliderBase);
+        final toggleWidth = (sliderWidth * 0.78).clamp(220.0, 280.0);
 
         final parkBase = panelWidth * 0.7;
         final parkWidth = panelWidth < 150.0
@@ -1679,6 +1736,7 @@ class CenterPanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ModeSlideToggle(
+              width: toggleWidth,
               title: modeTitle,
               leftLabel: remoteLabel,
               rightLabel: manualLabel,
@@ -1760,6 +1818,7 @@ class CenterPanel extends StatelessWidget {
 class ModeSlideToggle extends StatelessWidget {
   const ModeSlideToggle({
     super.key,
+    required this.width,
     required this.title,
     required this.leftLabel,
     required this.rightLabel,
@@ -1767,6 +1826,7 @@ class ModeSlideToggle extends StatelessWidget {
     required this.onChanged,
   });
 
+  final double width;
   final String title;
   final String leftLabel;
   final String rightLabel;
@@ -1789,7 +1849,7 @@ class ModeSlideToggle extends StatelessWidget {
         GestureDetector(
           onTap: () => onChanged(!manualSelected),
           child: Container(
-            width: 216,
+            width: width,
             height: 44,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
@@ -2154,6 +2214,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
+
 
 
 
