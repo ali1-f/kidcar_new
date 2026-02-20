@@ -23,7 +23,7 @@ static bool selectorBackActive = false;
 static float selectorThrottleVoltage = 0.0f;
 static uint8_t selectorThrottlePct = 0;
 static uint32_t lastAnalogLogMs = 0;
-static const float BATTERY_ADC_PIN_CAL_FACTOR = 0.9700f; // user calibrated
+static const float BATTERY_ADC_PIN_CAL_FACTOR = 0.9759f; // user calibrated
 
 static void setRgb(uint8_t r, uint8_t g, uint8_t b) {
   rgbLedWrite(RGB_PIN, r, g, b);
