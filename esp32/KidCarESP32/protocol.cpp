@@ -15,6 +15,7 @@ bool protocolParse(const char* msg, ControlCommand& out) {
   out.accelMs = doc["accel_ms"] | REAR_RAMP_MS;
   out.manualMode = doc["manual"] | false;
   out.park = doc["park"] | false;
+  out.reverseSpeed = doc["reverse_speed"] | 50;
 
   if (doc["mode"].is<const char*>()) {
     const char* mode = doc["mode"];
@@ -37,6 +38,7 @@ bool protocolParse(const char* msg, ControlCommand& out) {
   if (out.speed < 0) out.speed = 0;
   if (out.accelMs < 100) out.accelMs = 100;
   if (out.accelMs > 5000) out.accelMs = 5000;
+  if (out.reverseSpeed > 100) out.reverseSpeed = 100;
 
   return true;
 }

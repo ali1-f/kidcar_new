@@ -5,7 +5,7 @@
 #include "config.h"
 #include <Arduino.h>
 
-static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false, false};
+static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false, false, 50};
 static uint32_t lastAppMs = 0;
 static bool appConnected = false;
 static uint32_t lastBlink = 0;
@@ -140,6 +140,11 @@ static ControlCommand resolveDriveCommand() {
     if (back && !fwd) dir = -1;
 
     int pct = readManualThrottlePct();
+    int reverseLimit = (int)lastCmd.reverseSpeed;
+    if (reverseLimit < 0) reverseLimit = 0;
+    if (reverseLimit > 100) reverseLimit = 100;
+    if (dir < 0 && pct > reverseLimit) pct = reverseLimit;
+
     selectorThrottlePct = (uint8_t)pct;
     // Keep full stop when throttle voltage commands 0%.
     // Soft-start minimum applies only for non-zero throttle requests.
@@ -152,6 +157,15 @@ static ControlCommand resolveDriveCommand() {
     cmd.steer = 0;
     cmd.steerMs = STEER_MAX_MS;
     cmd.speed = pct;
+  }
+
+  if (cmd.throttle < 0) {
+    int reverseLimit = (int)lastCmd.reverseSpeed;
+    if (reverseLimit < 0) reverseLimit = 0;
+    if (reverseLimit > 100) reverseLimit = 100;
+    int rev = -cmd.throttle;
+    if (rev > reverseLimit) cmd.throttle = -reverseLimit;
+    if (cmd.speed > reverseLimit) cmd.speed = reverseLimit;
   }
 
   return cmd;
@@ -300,4 +314,5 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
 

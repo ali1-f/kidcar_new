@@ -491,6 +491,7 @@ class _ControlScreenState extends State<ControlScreen>
       'steer': _steer,
       'speed': _speed,
       'accel_ms': _accelMs,
+      'reverse_speed': _reverseSpeed,
       'park': _parked,
       'signal': _signal,
       'mode': _manualMode ? 'manual' : 'remote',
@@ -2096,6 +2097,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
 

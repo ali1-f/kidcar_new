@@ -9,7 +9,9 @@ struct ControlCommand {
   uint16_t accelMs; // rear PWM ramp time (ms)
   bool manualMode;  // true = use hardware manual inputs
   bool park;        // true = movement lock
+  uint8_t reverseSpeed; // 0..100 max reverse speed
 };
 
 bool protocolParse(const char* msg, ControlCommand& out);
+
 
