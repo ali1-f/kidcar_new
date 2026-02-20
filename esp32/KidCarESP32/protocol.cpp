@@ -14,6 +14,7 @@ bool protocolParse(const char* msg, ControlCommand& out) {
   out.speed = doc["speed"] | 0;
   out.accelMs = doc["accel_ms"] | REAR_RAMP_MS;
   out.manualMode = doc["manual"] | false;
+  out.park = doc["park"] | false;
 
   if (doc["mode"].is<const char*>()) {
     const char* mode = doc["mode"];

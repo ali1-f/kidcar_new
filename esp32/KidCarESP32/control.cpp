@@ -5,7 +5,7 @@
 #include "config.h"
 #include <Arduino.h>
 
-static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false};
+static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false, false};
 static uint32_t lastAppMs = 0;
 static bool appConnected = false;
 static uint32_t lastBlink = 0;
@@ -99,6 +99,22 @@ static ControlCommand resolveDriveCommand() {
   selectorThrottlePct = 0;
 
   if (manualActive) {
+    const bool parkLockedByApp = appConnected && lastCmd.manualMode && lastCmd.park;
+    if (parkLockedByApp) {
+      // Safety lock: when app is connected in MANUAL mode and Park is ON,
+      // ignore selector commands until Park is released from the app.
+      manualGear = 0;
+      selectorFwdActive = false;
+      selectorBackActive = false;
+      selectorThrottleVoltage = readManualThrottleVoltage();
+      selectorThrottlePct = 0;
+      cmd.throttle = 0;
+      cmd.steer = 0;
+      cmd.steerMs = STEER_MAX_MS;
+      cmd.speed = 0;
+      return cmd;
+    }
+
     const float throttleV = readManualThrottleVoltage();
     selectorThrottleVoltage = throttleV;
     if (throttleV > 2.0f) {
@@ -284,3 +300,4 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
