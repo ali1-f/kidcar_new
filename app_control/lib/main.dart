@@ -1155,130 +1155,79 @@ class StatusBarWidget extends StatelessWidget {
           BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final sideWidth =
-              ((constraints.maxWidth - 300.0) / 2).clamp(130.0, 380.0);
-          final titleWidth =
-              (constraints.maxWidth - (2 * sideWidth)).clamp(100.0, constraints.maxWidth);
-
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: titleWidth,
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          Text(
+            connectedLabel,
+            style: TextStyle(
+              color: connected
+                  ? const Color(0xFF2ECC71)
+                  : const Color(0xFFE74C3C),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            manualMode ? 'M:$manualGear' : 'M:-',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              Positioned.fill(
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: sideWidth,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                connectedLabel,
-                                style: TextStyle(
-                                  color: connected
-                                      ? const Color(0xFF2ECC71)
-                                      : const Color(0xFFE74C3C),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                manualMode ? 'M:$manualGear' : 'M:-',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: sideWidth,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _timeText(),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              GestureDetector(
-                                onTap: onWifiTap,
-                                child: Icon(
-                                  _wifiIcon(signal),
-                                  color: _levelColor(signal),
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              BatteryIcon(
-                                voltage: batteryVoltage,
-                                dangerThreshold: dangerBatteryVolt,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${batteryVoltage.toStringAsFixed(2)}V',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              IconButton(
-                                onPressed: onSettingsTap,
-                                icon: const Icon(Icons.settings, color: Colors.white),
-                                tooltip: 'Settings',
-                              ),
-                              IconButton(
-                                onPressed: onChangeLanguage,
-                                icon: const Icon(Icons.translate, color: Colors.white),
-                                tooltip: (lang == AppLang.fa) ? '\u0632\u0628\u0627\u0646' : 'Language',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+            ),
+          ),
+          Text(
+            _timeText(),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: onWifiTap,
+            child: Icon(_wifiIcon(signal), color: _levelColor(signal), size: 20),
+          ),
+          const SizedBox(width: 12),
+          BatteryIcon(
+            voltage: batteryVoltage,
+            dangerThreshold: dangerBatteryVolt,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${batteryVoltage.toStringAsFixed(2)}V',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 16),
+          IconButton(
+            onPressed: onSettingsTap,
+            icon: const Icon(Icons.settings, color: Colors.white),
+            tooltip: 'Settings',
+          ),
+          IconButton(
+            onPressed: onChangeLanguage,
+            icon: const Icon(Icons.translate, color: Colors.white),
+            tooltip: (lang == AppLang.fa) ? '\u0632\u0628\u0627\u0646' : 'Language',
+          ),
+        ],
       ),
     );
   }
@@ -2214,6 +2163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
 
