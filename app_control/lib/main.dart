@@ -2054,7 +2054,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-              if (trailing != null) trailing,
+              if (trailing case final Widget trailingWidget) trailingWidget,
             ],
           ),
           const SizedBox(height: 6),
@@ -2163,6 +2163,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
+
 
 
 
