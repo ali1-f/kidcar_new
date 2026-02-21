@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -298,6 +299,15 @@ class _ControlScreenState extends State<ControlScreen>
   bool _gyroPressed = false;
   int _gyroSteer = 0;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  double _gravityX = 0.0;
+  double _gravityY = 0.0;
+  double _gravityZ = 9.81;
+  bool _gravityReady = false;
+  double _gyroBiasRate = 0.0;
+  int _gyroBiasSamples = 0;
+  DateTime? _gyroCalibratingUntil;
+  double _gyroFilteredProjectedRate = 0.0;
   bool _parkBlinkOn = false;
   static const Duration _steerHoldLimit = Duration(seconds: 4);
   DateTime? _steerHoldStartedAt;
@@ -351,6 +361,7 @@ class _ControlScreenState extends State<ControlScreen>
     WakelockPlus.enable();
     _requestIgnoreBatteryOptimizations();
     _loadPersistedControls();
+    _startMotionSensing();
     _udp.init();
     _startConnectProbe();
     _sendState();
@@ -392,6 +403,46 @@ class _ControlScreenState extends State<ControlScreen>
     await prefs.setBool(_kParkedKey, _parked);
   }
 
+  void _startMotionSensing() {
+    _accelSub?.cancel();
+    _accelSub = accelerometerEventStream().listen((event) {
+      const alpha = 0.90;
+      if (!_gravityReady) {
+        _gravityX = event.x;
+        _gravityY = event.y;
+        _gravityZ = event.z;
+        _gravityReady = true;
+        return;
+      }
+      _gravityX = (alpha * _gravityX) + ((1 - alpha) * event.x);
+      _gravityY = (alpha * _gravityY) + ((1 - alpha) * event.y);
+      _gravityZ = (alpha * _gravityZ) + ((1 - alpha) * event.z);
+    });
+  }
+  double _projectGyroOnGravity(GyroscopeEvent event) {
+    if (!_gravityReady) return event.z;
+    final norm = math.sqrt(
+      (_gravityX * _gravityX) + (_gravityY * _gravityY) + (_gravityZ * _gravityZ),
+    );
+    if (norm < 0.001) return event.z;
+    final gx = _gravityX / norm;
+    final gy = _gravityY / norm;
+    final gz = _gravityZ / norm;
+    return (event.x * gx) + (event.y * gy) + (event.z * gz);
+  }
+  int _steerFromProjectedRate(double rateRadPerSec) {
+    const onThreshold = 0.20;
+    const offThreshold = 0.12;
+    final absRate = rateRadPerSec.abs();
+    if (_gyroSteer == 0) {
+      if (rateRadPerSec > onThreshold) return -_speed;
+      if (rateRadPerSec < -onThreshold) return _speed;
+      return 0;
+    }
+    if (absRate < offThreshold) return 0;
+    return rateRadPerSec > 0 ? -_speed : _speed;
+  }
+
   Future<void> _requestIgnoreBatteryOptimizations() async {
     try {
       await _powerChannel.invokeMethod<bool>('requestIgnoreBatteryOptimizations');
@@ -405,6 +456,7 @@ class _ControlScreenState extends State<ControlScreen>
     _parkBlinkTimer?.cancel();
     _txTimer?.cancel();
     _gyroSub?.cancel();
+    _accelSub?.cancel();
     _connectProbeTimer?.cancel();
     _heartbeatTimer?.cancel();
     _keyboardFocusNode.dispose();
@@ -824,13 +876,30 @@ class _ControlScreenState extends State<ControlScreen>
     }
     if (_gyroPressed) return;
     _gyroPressed = true;
+    _gyroSteer = 0;
+    _gyroFilteredProjectedRate = 0.0;
+    _gyroBiasRate = 0.0;
+    _gyroBiasSamples = 0;
+    _gyroCalibratingUntil = DateTime.now().add(const Duration(milliseconds: 450));
+
     _gyroSub?.cancel();
     _gyroSub = gyroscopeEventStream().listen((event) {
       if (!_gyroPressed) return;
-      const deadband = 0.18;
-      int nextSteer = 0;
-      if (event.z > deadband) nextSteer = -_speed;
-      if (event.z < -deadband) nextSteer = _speed;
+
+      final now = DateTime.now();
+      final projectedRate = _projectGyroOnGravity(event);
+
+      final calibratingUntil = _gyroCalibratingUntil;
+      if (calibratingUntil != null && now.isBefore(calibratingUntil)) {
+        _gyroBiasSamples += 1;
+        _gyroBiasRate += (projectedRate - _gyroBiasRate) / _gyroBiasSamples;
+      }
+
+      final correctedRate = projectedRate - _gyroBiasRate;
+      _gyroFilteredProjectedRate =
+          (_gyroFilteredProjectedRate * 0.80) + (correctedRate * 0.20);
+
+      final nextSteer = _steerFromProjectedRate(_gyroFilteredProjectedRate);
       if (_gyroSteer != nextSteer) {
         _gyroSteer = nextSteer;
         _applyMotion();
@@ -842,6 +911,10 @@ class _ControlScreenState extends State<ControlScreen>
   void _gyroUp() {
     _gyroPressed = false;
     _gyroSteer = 0;
+    _gyroFilteredProjectedRate = 0.0;
+    _gyroBiasRate = 0.0;
+    _gyroBiasSamples = 0;
+    _gyroCalibratingUntil = null;
     _gyroSub?.cancel();
     _gyroSub = null;
     _applyMotion();
@@ -2163,6 +2236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 
 
 
