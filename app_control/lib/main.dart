@@ -2075,13 +2075,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return _card(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
-          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -2090,20 +2090,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: const TextStyle(
                     color: Color(0xFF0B6E8E),
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
               ),
               if (trailing case final Widget trailingWidget) trailingWidget,
             ],
           ),
-          const SizedBox(height: 6),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            ),
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              onChanged: onChanged,
+            ),
           ),
         ],
       ),
@@ -2112,6 +2118,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sliderSectionHeight = (MediaQuery.sizeOf(context).height / 8).clamp(
+      92.0,
+      130.0,
+    );
     return PopScope<_SettingsResult>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -2136,62 +2146,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    _sliderCard(
-                      title: widget.t('accel_time'),
-                      valueText: '${_accelSec.toStringAsFixed(1)} s',
-                      value: _accelSec,
-                      min: 0.1,
-                      max: 5.0,
-                      divisions: 49,
-                      onChanged: (v) => setState(() => _accelSec = v),
+                    SizedBox(
+                      height: sliderSectionHeight,
+                      child: _sliderCard(
+                        title: widget.t('accel_time'),
+                        valueText: '${_accelSec.toStringAsFixed(1)} s',
+                        value: _accelSec,
+                        min: 0.1,
+                        max: 5.0,
+                        divisions: 49,
+                        onChanged: (v) => setState(() => _accelSec = v),
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    _sliderCard(
-                      title: widget.t('reverse_speed'),
-                      valueText: '${_reverseSpeed.round()} %',
-                      value: _reverseSpeed,
-                      min: 0,
-                      max: 100,
-                      divisions: 100,
-                      onChanged: (v) => setState(() => _reverseSpeed = v),
+                    SizedBox(
+                      height: sliderSectionHeight,
+                      child: _sliderCard(
+                        title: widget.t('reverse_speed'),
+                        valueText: '${_reverseSpeed.round()} %',
+                        value: _reverseSpeed,
+                        min: 0,
+                        max: 100,
+                        divisions: 100,
+                        onChanged: (v) => setState(() => _reverseSpeed = v),
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    _sliderCard(
-                      title: widget.t('danger_battery'),
-                      valueText: '${_dangerBatteryVolt.toStringAsFixed(2)} V',
-                      value: _dangerBatteryVolt.clamp(8.0, 15.0),
-                      min: 8.0,
-                      max: 15.0,
-                      divisions: 140,
-                      onChanged: (v) {
-                        setState(() {
-                          _dangerBatteryVolt = v;
-                          _dangerController.text = v.toStringAsFixed(2);
-                        });
-                      },
-                      trailing: SizedBox(
-                        width: 120,
-                        child: TextField(
-                          controller: _dangerController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          textAlign: TextAlign.center,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: '10.80',
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
+                    SizedBox(
+                      height: sliderSectionHeight,
+                      child: _sliderCard(
+                        title: widget.t('danger_battery'),
+                        valueText: '${_dangerBatteryVolt.toStringAsFixed(2)} V',
+                        value: _dangerBatteryVolt.clamp(8.0, 15.0),
+                        min: 8.0,
+                        max: 15.0,
+                        divisions: 140,
+                        onChanged: (v) {
+                          setState(() {
+                            _dangerBatteryVolt = v;
+                            _dangerController.text = v.toStringAsFixed(2);
+                          });
+                        },
+                        trailing: SizedBox(
+                          width: 110,
+                          child: TextField(
+                            controller: _dangerController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            textAlign: TextAlign.center,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              hintText: '10.80',
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                            ),
+                            onChanged: (v) {
+                              final parsed = double.tryParse(v);
+                              if (parsed != null) {
+                                setState(() => _dangerBatteryVolt = parsed);
+                              }
+                            },
                           ),
-                          onChanged: (v) {
-                            final parsed = double.tryParse(v);
-                            if (parsed != null) {
-                              setState(() => _dangerBatteryVolt = parsed);
-                            }
-                          },
                         ),
                       ),
                     ),
