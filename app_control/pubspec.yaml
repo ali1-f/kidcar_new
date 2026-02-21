@@ -103,6 +103,6 @@ flutter_launcher_icons:
     generate: true
   macos:
     generate: true
-  image_path: "assets/icons/porsche_red_white.png"
+  image_path: "assets/icons/porsche_shutterstock_1030827028_icon.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icons/porsche_red_white.png"
+  adaptive_icon_foreground: "assets/icons/porsche_shutterstock_1030827028_icon.png"
