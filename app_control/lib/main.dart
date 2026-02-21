@@ -33,7 +33,6 @@ enum AppLang { fa, en }
 class KidCarApp extends StatefulWidget {
   const KidCarApp({super.key});
 
-
   @override
   State<KidCarApp> createState() => _KidCarAppState();
 }
@@ -82,9 +81,7 @@ class _KidCarAppState extends State<KidCarApp> {
     if (!_langReady) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
@@ -334,7 +331,6 @@ class _ControlScreenState extends State<ControlScreen>
   bool get _isMobilePlatform {
     if (kIsWeb) return false;
     return Platform.isAndroid || Platform.isIOS;
-
   }
 
   late final UdpSender _udp = UdpSender(
@@ -372,10 +368,13 @@ class _ControlScreenState extends State<ControlScreen>
     if (!mounted) return;
     setState(() {
       _speed = (prefs.getInt(_kSpeedKey) ?? _speed).clamp(_minSpeed, 100);
-      _reverseSpeed =
-          (prefs.getInt(_kReverseSpeedKey) ?? _reverseSpeed).clamp(0, 100);
+      _reverseSpeed = (prefs.getInt(_kReverseSpeedKey) ?? _reverseSpeed).clamp(
+        0,
+        100,
+      );
       _accelMs = (prefs.getInt(_kAccelMsKey) ?? _accelMs).clamp(100, 5000);
-      _dangerBatteryVolt = prefs.getDouble(_kDangerVoltKey) ?? _dangerBatteryVolt;
+      _dangerBatteryVolt =
+          prefs.getDouble(_kDangerVoltKey) ?? _dangerBatteryVolt;
       _manualMode = prefs.getBool(_kManualModeKey) ?? _manualMode;
       _parked = prefs.getBool(_kParkedKey) ?? _parked;
     });
@@ -394,7 +393,9 @@ class _ControlScreenState extends State<ControlScreen>
 
   Future<void> _requestIgnoreBatteryOptimizations() async {
     try {
-      await _powerChannel.invokeMethod<bool>('requestIgnoreBatteryOptimizations');
+      await _powerChannel.invokeMethod<bool>(
+        'requestIgnoreBatteryOptimizations',
+      );
     } catch (_) {}
   }
 
@@ -508,7 +509,9 @@ class _ControlScreenState extends State<ControlScreen>
             _signal = 80;
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
-            _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+            _manualGear = (manualGear == 'F' || manualGear == 'R')
+                ? manualGear
+                : 'N';
             if (battV != null) _batteryVoltage = battV;
             _espAddress = address;
           });
@@ -522,7 +525,9 @@ class _ControlScreenState extends State<ControlScreen>
             if (battV != null) _batteryVoltage = battV;
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
-            _manualGear = (manualGear == 'F' || manualGear == 'R') ? manualGear : 'N';
+            _manualGear = (manualGear == 'F' || manualGear == 'R')
+                ? manualGear
+                : 'N';
           });
         }
       }
@@ -549,6 +554,7 @@ class _ControlScreenState extends State<ControlScreen>
     }
     return payload;
   }
+
   int _computeSteerWithHoldLimit() {
     if (_gyroPressed) {
       return _gyroSteer;
@@ -627,7 +633,9 @@ class _ControlScreenState extends State<ControlScreen>
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network'),
+          title: Text(
+            (widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network',
+          ),
           content: Text((widget.lang == AppLang.fa) ? 'نامشخص' : 'Unknown'),
           actions: [
             TextButton(
@@ -653,7 +661,9 @@ class _ControlScreenState extends State<ControlScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text((widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network'),
+        title: Text(
+          (widget.lang == AppLang.fa) ? 'شبکه وای‌فای' : 'Wi-Fi Network',
+        ),
         content: Text(name),
         actions: [
           TextButton(
@@ -827,7 +837,7 @@ class _ControlScreenState extends State<ControlScreen>
     _gyroSub?.cancel();
     _gyroSub = gyroscopeEventStream().listen((event) {
       if (!_gyroPressed) return;
-      const deadband = 0.18;
+      const deadband = 0.25;
       int nextSteer = 0;
       if (event.z > deadband) nextSteer = -_speed;
       if (event.z < -deadband) nextSteer = _speed;
@@ -984,7 +994,9 @@ class _ControlScreenState extends State<ControlScreen>
                   dangerBatteryVolt: _dangerBatteryVolt,
                   signal: _signal,
                   connected: _connected,
-                  connectedLabel: _connected ? t('connected') : t('disconnected'),
+                  connectedLabel: _connected
+                      ? t('connected')
+                      : t('disconnected'),
                   manualMode: _espManualMode,
                   manualGear: _manualGear,
                   lang: widget.lang,
@@ -1007,12 +1019,15 @@ class _ControlScreenState extends State<ControlScreen>
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               const gap = 18.0;
-                              final rawHeight = (constraints.maxHeight - gap) / 2;
+                              final rawHeight =
+                                  (constraints.maxHeight - gap) / 2;
                               final buttonHeight = rawHeight < 52.0
                                   ? rawHeight
                                   : (rawHeight > 120.0 ? 120.0 : rawHeight);
                               final verticalMargin =
-                                  (constraints.maxHeight - ((2 * buttonHeight) + gap)) / 2;
+                                  (constraints.maxHeight -
+                                      ((2 * buttonHeight) + gap)) /
+                                  2;
                               final gyroBottom = verticalMargin;
                               return Stack(
                                 children: [
@@ -1030,19 +1045,19 @@ class _ControlScreenState extends State<ControlScreen>
                                     ),
                                   ),
                                   if (_isMobilePlatform)
-                                  Positioned(
-                                    left: 0,
-                                    right: 0,
-                                    bottom: gyroBottom,
-                                    child: Center(
-                                      child: GyroHoldButton(
-                                        label: t('gyro'),
-                                        onPress: _gyroDown,
-                                        onRelease: _gyroUp,
-                                        active: _gyroPressed,
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      bottom: gyroBottom,
+                                      child: Center(
+                                        child: GyroHoldButton(
+                                          label: t('gyro'),
+                                          onPress: _gyroDown,
+                                          onRelease: _gyroUp,
+                                          active: _gyroPressed,
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               );
                             },
@@ -1094,6 +1109,23 @@ class _ControlScreenState extends State<ControlScreen>
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Opacity(
+                  opacity: 0.45,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Design by A.F.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                        color: Color(0xFF1F2A37),
+                      ),
                     ),
                   ),
                 ),
@@ -1200,7 +1232,11 @@ class StatusBarWidget extends StatelessWidget {
           const SizedBox(width: 16),
           GestureDetector(
             onTap: onWifiTap,
-            child: Icon(_wifiIcon(signal), color: _levelColor(signal), size: 20),
+            child: Icon(
+              _wifiIcon(signal),
+              color: _levelColor(signal),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           BatteryIcon(
@@ -1225,7 +1261,9 @@ class StatusBarWidget extends StatelessWidget {
           IconButton(
             onPressed: onChangeLanguage,
             icon: const Icon(Icons.translate, color: Colors.white),
-            tooltip: (lang == AppLang.fa) ? '\u0632\u0628\u0627\u0646' : 'Language',
+            tooltip: (lang == AppLang.fa)
+                ? '\u0632\u0628\u0627\u0646'
+                : 'Language',
           ),
         ],
       ),
@@ -1244,6 +1282,7 @@ class StatusBarWidget extends StatelessWidget {
     return Icons.wifi;
   }
 }
+
 class BatteryIcon extends StatelessWidget {
   const BatteryIcon({
     super.key,
@@ -1990,11 +2029,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       text: _dangerBatteryVolt.toStringAsFixed(2),
     );
   }
+
   @override
   void dispose() {
     _dangerController.dispose();
     super.dispose();
   }
+
   _SettingsResult _result() {
     return _SettingsResult(
       accelMs: (_accelSec * 1000).round(),
@@ -2002,6 +2043,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       dangerBatteryVolt: _dangerBatteryVolt,
     );
   }
+
   Widget _card({required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -2020,6 +2062,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: child,
     );
   }
+
   Widget _sliderCard({
     required String title,
     required String valueText,
@@ -2036,10 +2079,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
           const SizedBox(height: 6),
           Row(
@@ -2069,6 +2109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return PopScope<_SettingsResult>(
@@ -2132,8 +2173,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: 120,
                         child: TextField(
                           controller: _dangerController,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           textAlign: TextAlign.center,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
@@ -2163,14 +2205,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
