@@ -298,12 +298,6 @@ class _ControlScreenState extends State<ControlScreen>
   bool _gyroPressed = false;
   int _gyroSteer = 0;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
-  double _gyroAngleDeg = 0.0;
-  DateTime? _lastGyroSampleAt;
-  static const double _gyroAngleDeadbandDeg = 3.0;
-  static const double _gyroFullSteerAngleDeg = 28.0;
-  static const double _gyroMinRateRadPerSec = 0.02;
-  static const double _radToDeg = 57.29577951308232;
   bool _parkBlinkOn = false;
   static const Duration _steerHoldLimit = Duration(seconds: 4);
   DateTime? _steerHoldStartedAt;
@@ -555,36 +549,8 @@ class _ControlScreenState extends State<ControlScreen>
     }
     return payload;
   }
-  int _steerFromGyroAngle() {
-    final double clampedAngle =
-        _gyroAngleDeg.clamp(-_gyroFullSteerAngleDeg, _gyroFullSteerAngleDeg);
-    if (clampedAngle.abs() < _gyroAngleDeadbandDeg) {
-      return 0;
-    }
-    final double normalized = clampedAngle / _gyroFullSteerAngleDeg;
-    return (-normalized * _speed).round().clamp(-_speed, _speed);
-  }
-
-  void _integrateGyroAngle(double rateRadPerSec, DateTime now) {
-    final DateTime? last = _lastGyroSampleAt;
-    _lastGyroSampleAt = now;
-    if (last == null) return;
-
-    final double dtSec = now.difference(last).inMicroseconds / 1000000.0;
-    if (dtSec <= 0.0 || dtSec > 0.2) return;
-
-    final double cleanedRate =
-        rateRadPerSec.abs() < _gyroMinRateRadPerSec ? 0.0 : rateRadPerSec;
-    _gyroAngleDeg += cleanedRate * dtSec * _radToDeg;
-    _gyroAngleDeg = _gyroAngleDeg.clamp(
-      -(_gyroFullSteerAngleDeg * 1.35),
-      _gyroFullSteerAngleDeg * 1.35,
-    );
-  }
-
   int _computeSteerWithHoldLimit() {
     if (_gyroPressed) {
-      _gyroSteer = _steerFromGyroAngle();
       return _gyroSteer;
     }
 
@@ -858,14 +824,13 @@ class _ControlScreenState extends State<ControlScreen>
     }
     if (_gyroPressed) return;
     _gyroPressed = true;
-    _gyroAngleDeg = 0.0;
-    _gyroSteer = 0;
-    _lastGyroSampleAt = DateTime.now();
     _gyroSub?.cancel();
     _gyroSub = gyroscopeEventStream().listen((event) {
       if (!_gyroPressed) return;
-      _integrateGyroAngle(event.z, DateTime.now());
-      final int nextSteer = _steerFromGyroAngle();
+      const deadband = 0.18;
+      int nextSteer = 0;
+      if (event.z > deadband) nextSteer = -_speed;
+      if (event.z < -deadband) nextSteer = _speed;
       if (_gyroSteer != nextSteer) {
         _gyroSteer = nextSteer;
         _applyMotion();
@@ -877,8 +842,6 @@ class _ControlScreenState extends State<ControlScreen>
   void _gyroUp() {
     _gyroPressed = false;
     _gyroSteer = 0;
-    _gyroAngleDeg = 0.0;
-    _lastGyroSampleAt = null;
     _gyroSub?.cancel();
     _gyroSub = null;
     _applyMotion();
@@ -2200,7 +2163,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
 
 
 
