@@ -238,9 +238,9 @@ void controlLoop() {
   const float instantOu1 = readCurrentOu1VoltageInstant();
   const float instantOu2 = readCurrentOu2VoltageInstant();
   const float instantAmp = readCurrentAmpInstantFromOu1(instantOu1);
-  currentOu1Voltage = instantOu1;
-  currentOu2Voltage = instantOu2;
-  currentAmp = instantAmp;
+  currentOu1Voltage = (currentOu1Voltage * 0.85f) + (instantOu1 * 0.15f);
+  currentOu2Voltage = (currentOu2Voltage * 0.85f) + (instantOu2 * 0.15f);
+  currentAmp = (currentAmp * 0.85f) + (instantAmp * 0.15f);
 
   const ControlCommand cmd = resolveDriveCommand();
   if (cmd.throttle > 0) driveDir = 1;
@@ -386,4 +386,3 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
-
