@@ -306,6 +306,8 @@ class _ControlScreenState extends State<ControlScreen>
 
   double _batteryVoltage = 12.00;
   double _currentAmp = 0.000;
+  double _currentOu1V = 0.000;
+  double _currentOu2V = 0.000;
   double _dangerBatteryVolt = 10.8;
   bool _manualMode = false;
   bool _espManualMode = false;
@@ -542,12 +544,20 @@ class _ControlScreenState extends State<ControlScreen>
         final manualGear = (obj['manual_gear'] ?? 'N').toString().toUpperCase();
         final dynamic battRaw = obj['batt_v'];
         final dynamic currentRaw = obj['cur_a'];
+        final dynamic curOu1Raw = obj['cur_ou1_v'];
+        final dynamic curOu2Raw = obj['cur_ou2_v'];
         final double? battV = battRaw is num
             ? battRaw.toDouble()
             : double.tryParse(battRaw?.toString() ?? '');
         final double? currentA = currentRaw is num
             ? currentRaw.toDouble()
             : double.tryParse(currentRaw?.toString() ?? '');
+        final double? curOu1V = curOu1Raw is num
+            ? curOu1Raw.toDouble()
+            : double.tryParse(curOu1Raw?.toString() ?? '');
+        final double? curOu2V = curOu2Raw is num
+            ? curOu2Raw.toDouble()
+            : double.tryParse(curOu2Raw?.toString() ?? '');
 
         if (!_connected || _signal < 80) {
           setState(() {
@@ -560,6 +570,8 @@ class _ControlScreenState extends State<ControlScreen>
                 : 'N';
             if (battV != null) _batteryVoltage = battV;
             if (currentA != null) _currentAmp = currentA;
+            if (curOu1V != null) _currentOu1V = curOu1V;
+            if (curOu2V != null) _currentOu2V = curOu2V;
             _espAddress = address;
           });
           _udp.address = address;
@@ -567,10 +579,16 @@ class _ControlScreenState extends State<ControlScreen>
             _espAddress!.address != address.address) {
           _espAddress = address;
           _udp.address = address;
-        } else if (battV != null || currentA != null || mode.isNotEmpty) {
+        } else if (battV != null ||
+            currentA != null ||
+            curOu1V != null ||
+            curOu2V != null ||
+            mode.isNotEmpty) {
           setState(() {
             if (battV != null) _batteryVoltage = battV;
             if (currentA != null) _currentAmp = currentA;
+            if (curOu1V != null) _currentOu1V = curOu1V;
+            if (curOu2V != null) _currentOu2V = curOu2V;
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R')
@@ -1041,6 +1059,8 @@ class _ControlScreenState extends State<ControlScreen>
                   title: t('app_title'),
                   batteryVoltage: _batteryVoltage,
                   currentAmp: _currentAmp,
+                  currentOu1V: _currentOu1V,
+                  currentOu2V: _currentOu2V,
                   dangerBatteryVolt: _dangerBatteryVolt,
                   signal: _signal,
                   connected: _connected,
@@ -1194,6 +1214,8 @@ class StatusBarWidget extends StatelessWidget {
     required this.title,
     required this.batteryVoltage,
     required this.currentAmp,
+    required this.currentOu1V,
+    required this.currentOu2V,
     required this.dangerBatteryVolt,
     required this.signal,
     required this.connected,
@@ -1210,6 +1232,8 @@ class StatusBarWidget extends StatelessWidget {
   final String title;
   final double batteryVoltage;
   final double currentAmp;
+  final double currentOu1V;
+  final double currentOu2V;
   final double dangerBatteryVolt;
   final int signal;
   final bool connected;
@@ -1292,10 +1316,10 @@ class StatusBarWidget extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            '${currentAmp.toStringAsFixed(3)}A',
+            'O1:${currentOu1V.toStringAsFixed(3)}V O2:${currentOu2V.toStringAsFixed(3)}V',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
             ),
           ),
