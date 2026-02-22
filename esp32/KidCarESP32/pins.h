@@ -17,16 +17,12 @@ static const int PIN_L298_ENA = 21; // Enable (kept HIGH)
 static const int PIN_L298_IN1 = 10; // Dir
 static const int PIN_L298_IN2 = 11; // Dir
 
+
 // Manual selector + battery feedback inputs
 static const int PIN_BATTERY_FB = 1;   // ADC, divider 100k/22k
 static const int PIN_MANUAL_FWD = 14;  // Active LOW (pull-up to 3.3V)
 static const int PIN_MANUAL_BACK = 13; // Active LOW (pull-up to 3.3V)
 static const int PIN_MANUAL_THROTTLE = 12; // ADC direct: 3.0V idle, 1.0/0.5/0.0V gears
-
-// ACS758 current sensor outputs
-static const int PIN_CURRENT_OU2 = 8; // amplified output
-static const int PIN_CURRENT_OU1 = 9; // filtered linear output (preferred)
-
 // LEDC channels
 static const int CH_BTS_R = 0;
 static const int CH_BTS_L = 1;
@@ -34,3 +30,4 @@ static const int CH_L298  = 2;
 
 void setupPins();
 void setupPwm();
+

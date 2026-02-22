@@ -4,7 +4,6 @@
 #include "pins.h"
 #include "config.h"
 #include <Arduino.h>
-#include <math.h>
 
 static ControlCommand lastCmd = {0, 0, 0, 0, REAR_RAMP_MS, false, false, 50};
 static uint32_t lastAppMs = 0;
@@ -15,9 +14,6 @@ static bool relayOn = false;
 static uint32_t relayEnabledAt = 0;
 static const uint32_t RELAY_DELAY_MS = 100;
 static float batteryVoltage = 12.0f;
-static float currentAmp = 0.0f;
-static float currentOu1Voltage = CURRENT_SENSOR_ZERO_V;
-static float currentOu2Voltage = CURRENT_SENSOR_ZERO_V;
 static bool manualActive = false;
 static int8_t manualGear = 0; // -1 reverse, 0 neutral, 1 forward
 static int8_t driveDir = 0;    // -1 reverse, 0 stop, 1 forward
@@ -48,13 +44,9 @@ static int readAdcAvg(int pin, uint8_t samples) {
   return (int)(sum / samples);
 }
 
-static float adcRawToVoltage(int raw) {
-  return ((float)raw * 3.3f) / 4095.0f;
-}
-
 static float readBatteryVoltageInstant() {
   const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
-  const float vAdc = adcRawToVoltage(raw);
+  const float vAdc = ((float)raw * 3.3f) / 4095.0f;
   const float divider = (100.0f + 22.0f) / 22.0f;
   float vBat = vAdc * divider * BATTERY_VOLT_CAL_FACTOR;
   if (vBat < 0.0f) vBat = 0.0f;
@@ -64,31 +56,13 @@ static float readBatteryVoltageInstant() {
 
 static float readBatteryAdcVoltage() {
   const int raw = readAdcAvg(PIN_BATTERY_FB, 8);
-  return adcRawToVoltage(raw) * BATTERY_ADC_PIN_CAL_FACTOR;
+  return (((float)raw * 3.3f) / 4095.0f) * BATTERY_ADC_PIN_CAL_FACTOR;
 }
 
-static float readCurrentOu1VoltageInstant() {
-  const int raw = readAdcAvg(PIN_CURRENT_OU1, 10);
-  return adcRawToVoltage(raw);
-}
-
-static float readCurrentOu2VoltageInstant() {
-  const int raw = readAdcAvg(PIN_CURRENT_OU2, 10);
-  return adcRawToVoltage(raw);
-}
-
-static float readCurrentAmpInstantFromOu1(float ou1Voltage) {
-  float amp = (ou1Voltage - CURRENT_SENSOR_ZERO_V) / CURRENT_SENSOR_SENS_V_PER_A;
-  amp = (amp * CURRENT_SENSOR_GAIN) + CURRENT_SENSOR_OFFSET_A;
-  if (fabsf(amp) < CURRENT_SENSOR_DEADBAND_A) amp = 0.0f;
-  if (amp > 80.0f) amp = 80.0f;
-  if (amp < -80.0f) amp = -80.0f;
-  return amp;
-}
 
 static int readManualThrottlePct() {
   const int raw = readAdcAvg(PIN_MANUAL_THROTTLE, 6);
-  const float v = adcRawToVoltage(raw);
+  const float v = ((float)raw * 3.3f) / 4095.0f;
 
   // Manual throttle mapping:
   // >=2.0V: full stop
@@ -120,7 +94,7 @@ static int readManualThrottlePct() {
 
 static float readManualThrottleVoltage() {
   const int raw = readAdcAvg(PIN_MANUAL_THROTTLE, 6);
-  return adcRawToVoltage(raw);
+  return ((float)raw * 3.3f) / 4095.0f;
 }
 
 static ControlCommand resolveDriveCommand() {
@@ -212,12 +186,6 @@ void controlInit() {
   lastAppMs = millis();
   setRelay(false);
   batteryVoltage = readBatteryVoltageInstant();
-
-  const float ou1 = readCurrentOu1VoltageInstant();
-  const float ou2 = readCurrentOu2VoltageInstant();
-  currentOu1Voltage = ou1;
-  currentOu2Voltage = ou2;
-  currentAmp = readCurrentAmpInstantFromOu1(ou1);
 }
 
 void controlApply(const ControlCommand& cmd) {
@@ -234,13 +202,6 @@ void controlLoop() {
   // Smooth battery voltage for stable UI readout
   const float instantBattery = readBatteryVoltageInstant();
   batteryVoltage = instantBattery;
-
-  const float instantOu1 = readCurrentOu1VoltageInstant();
-  const float instantOu2 = readCurrentOu2VoltageInstant();
-  const float instantAmp = readCurrentAmpInstantFromOu1(instantOu1);
-  currentOu1Voltage = (currentOu1Voltage * 0.85f) + (instantOu1 * 0.15f);
-  currentOu2Voltage = (currentOu2Voltage * 0.85f) + (instantOu2 * 0.15f);
-  currentAmp = (currentAmp * 0.85f) + (instantAmp * 0.15f);
 
   const ControlCommand cmd = resolveDriveCommand();
   if (cmd.throttle > 0) driveDir = 1;
@@ -314,18 +275,10 @@ void controlLoop() {
   } else {
     setRgb(0, 0, 0);
   }
-
   if (now - lastAnalogLogMs >= 500) {
     lastAnalogLogMs = now;
     const float battAdcV = readBatteryAdcVoltage();
-    Serial.printf(
-      "ADC_BAT=%.3fV BAT=%.2fV THR=%.3fV CUR1=%.3fV CUR2=%.3fV I=%.2fA\n",
-      battAdcV,
-      batteryVoltage,
-      selectorThrottleVoltage,
-      currentOu1Voltage,
-      currentOu2Voltage,
-      currentAmp);
+    Serial.printf("ADC_BAT=%.3fV BAT=%.2fV THR=%.3fV\n", battAdcV, batteryVoltage, selectorThrottleVoltage);
   }
 
   steerLoop();
@@ -341,18 +294,6 @@ void controlNotifyAppActivity() {
 
 float controlGetBatteryVoltage() {
   return batteryVoltage;
-}
-
-float controlGetCurrentAmp() {
-  return currentAmp;
-}
-
-float controlGetCurrentOu1Voltage() {
-  return currentOu1Voltage;
-}
-
-float controlGetCurrentOu2Voltage() {
-  return currentOu2Voltage;
 }
 
 bool controlIsManualActive() {
@@ -386,3 +327,12 @@ float controlGetSelectorThrottleVoltage() {
 uint8_t controlGetSelectorThrottlePct() {
   return selectorThrottlePct;
 }
+
+
+
+
+
+
+
+
+
