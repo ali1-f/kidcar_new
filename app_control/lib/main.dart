@@ -305,6 +305,7 @@ class _ControlScreenState extends State<ControlScreen>
   Timer? _connectProbeTimer;
 
   double _batteryVoltage = 12.00;
+  double _currentAmp = 0.000;
   double _dangerBatteryVolt = 10.8;
   bool _manualMode = false;
   bool _espManualMode = false;
@@ -540,9 +541,13 @@ class _ControlScreenState extends State<ControlScreen>
         final mode = (obj['mode'] ?? '').toString().toUpperCase();
         final manualGear = (obj['manual_gear'] ?? 'N').toString().toUpperCase();
         final dynamic battRaw = obj['batt_v'];
+        final dynamic currentRaw = obj['cur_a'];
         final double? battV = battRaw is num
             ? battRaw.toDouble()
             : double.tryParse(battRaw?.toString() ?? '');
+        final double? currentA = currentRaw is num
+            ? currentRaw.toDouble()
+            : double.tryParse(currentRaw?.toString() ?? '');
 
         if (!_connected || _signal < 80) {
           setState(() {
@@ -554,6 +559,7 @@ class _ControlScreenState extends State<ControlScreen>
                 ? manualGear
                 : 'N';
             if (battV != null) _batteryVoltage = battV;
+            if (currentA != null) _currentAmp = currentA;
             _espAddress = address;
           });
           _udp.address = address;
@@ -561,9 +567,10 @@ class _ControlScreenState extends State<ControlScreen>
             _espAddress!.address != address.address) {
           _espAddress = address;
           _udp.address = address;
-        } else if (battV != null || mode.isNotEmpty) {
+        } else if (battV != null || currentA != null || mode.isNotEmpty) {
           setState(() {
             if (battV != null) _batteryVoltage = battV;
+            if (currentA != null) _currentAmp = currentA;
             if (mode == 'MANUAL') _espManualMode = true;
             if (mode == 'REMOTE') _espManualMode = false;
             _manualGear = (manualGear == 'F' || manualGear == 'R')
@@ -1033,6 +1040,7 @@ class _ControlScreenState extends State<ControlScreen>
                 StatusBarWidget(
                   title: t('app_title'),
                   batteryVoltage: _batteryVoltage,
+                  currentAmp: _currentAmp,
                   dangerBatteryVolt: _dangerBatteryVolt,
                   signal: _signal,
                   connected: _connected,
@@ -1185,6 +1193,7 @@ class StatusBarWidget extends StatelessWidget {
     super.key,
     required this.title,
     required this.batteryVoltage,
+    required this.currentAmp,
     required this.dangerBatteryVolt,
     required this.signal,
     required this.connected,
@@ -1200,6 +1209,7 @@ class StatusBarWidget extends StatelessWidget {
 
   final String title;
   final double batteryVoltage;
+  final double currentAmp;
   final double dangerBatteryVolt;
   final int signal;
   final bool connected;
@@ -1281,6 +1291,15 @@ class StatusBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          Text(
+            '${currentAmp.toStringAsFixed(3)}A',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 8),
           BatteryIcon(
             voltage: batteryVoltage,
             dangerThreshold: dangerBatteryVolt,
