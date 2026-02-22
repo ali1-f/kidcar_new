@@ -135,9 +135,12 @@ void wifiApLoop() {
   }
 
   // Always send status back to sender (even if parse fails)
-  char resp[340];
+  char resp[460];
   const int clients = WiFi.softAPgetStationNum();
   const float batt = controlGetBatteryVoltage();
+  const float currentA = controlGetCurrentAmp();
+  const float currentOu1V = controlGetCurrentOu1Voltage();
+  const float currentOu2V = controlGetCurrentOu2Voltage();
   const char* mode = controlIsManualActive() ? "MANUAL" : "REMOTE";
   const int8_t manualGear = controlGetManualGear();
   const int8_t driveDir = controlGetDriveDir();
@@ -156,7 +159,7 @@ void wifiApLoop() {
   snprintf(
     resp,
     sizeof(resp),
-    "{\"ok\":1,\"clients\":%d,\"mode\":\"%s\",\"manual_gear\":\"%s\",\"drive_dir\":\"%s\",\"drive_speed\":%u,\"sel_fwd\":%d,\"sel_back\":%d,\"sel_throttle_v\":%.3f,\"sel_throttle_pct\":%u,\"batt_v\":%.2f,\"ms\":%lu}",
+    "{\"ok\":1,\"clients\":%d,\"mode\":\"%s\",\"manual_gear\":\"%s\",\"drive_dir\":\"%s\",\"drive_speed\":%u,\"sel_fwd\":%d,\"sel_back\":%d,\"sel_throttle_v\":%.3f,\"sel_throttle_pct\":%u,\"batt_v\":%.2f,\"cur_a\":%.2f,\"cur_ou1_v\":%.3f,\"cur_ou2_v\":%.3f,\"ms\":%lu}",
     clients,
     mode,
     gear,
@@ -167,6 +170,9 @@ void wifiApLoop() {
     selThrottleV,
     selThrottlePct,
     batt,
+    currentA,
+    currentOu1V,
+    currentOu2V,
     millis());
 
   Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());

@@ -23,10 +23,14 @@ void setupPins() {
   pinMode(PIN_MANUAL_BACK, INPUT_PULLUP);
   pinMode(PIN_MANUAL_THROTTLE, INPUT);
   pinMode(PIN_BATTERY_FB, INPUT);
+  pinMode(PIN_CURRENT_OU1, INPUT);
+  pinMode(PIN_CURRENT_OU2, INPUT);
 
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_MANUAL_THROTTLE, ADC_11db);
   analogSetPinAttenuation(PIN_BATTERY_FB, ADC_11db);
+  analogSetPinAttenuation(PIN_CURRENT_OU1, ADC_11db);
+  analogSetPinAttenuation(PIN_CURRENT_OU2, ADC_11db);
 
   digitalWrite(PIN_RELAY_EN, LOW);
   digitalWrite(PIN_BTS_REN, HIGH);
