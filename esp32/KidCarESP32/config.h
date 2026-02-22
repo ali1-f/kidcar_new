@@ -29,8 +29,14 @@ static const char* AP_SSID = "KidCar";
 static const char* AP_PASS = "88958004";
 static const uint16_t UDP_PORT = 4210;
 
+// OTA settings (Wi-Fi firmware upload)
+static const char* OTA_HOSTNAME = "kidcar-esp32";
+static const char* OTA_PASSWORD = "kidcar123";
+static const uint16_t OTA_PORT = 3232;
+
 // RGB LED pin (common ESP32-S3 boards use 48, some use 38)
 static const int RGB_PIN = 48;
+
 
 
 
