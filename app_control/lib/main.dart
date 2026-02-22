@@ -311,6 +311,7 @@ class _ControlScreenState extends State<ControlScreen>
   String _manualGear = 'N';
   int _signal = 66; // updated from Wi-Fi RSSI
   bool _connected = false;
+  bool _txSilencedByLifecycle = false;
   DateTime _lastAck = DateTime.fromMillisecondsSinceEpoch(0);
   InternetAddress? _espAddress;
   int _txCount = 0;
@@ -417,8 +418,47 @@ class _ControlScreenState extends State<ControlScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _reconnectAfterResume();
+      _resumeAfterForeground();
+      return;
     }
+    _engageSafetyParkAndSilence();
+  }
+
+  void _engageSafetyParkAndSilence() {
+    if (!mounted) return;
+    final hadMotion =
+        !_parked || _throttle != 0 || _steer != 0 || _anyPressed();
+
+    _stopTxLoop();
+    _keysDown.clear();
+    _gyroSub?.cancel();
+    _gyroSub = null;
+
+    setState(() {
+      _txSilencedByLifecycle = true;
+      _parked = true;
+      _forwardPressed = false;
+      _backPressed = false;
+      _leftPressed = false;
+      _rightPressed = false;
+      _gyroPressed = false;
+      _gyroSteer = 0;
+      _throttle = 0;
+      _steer = 0;
+      _parkBlinkOn = false;
+    });
+
+    if (hadMotion) {
+      _sendState(force: true);
+    }
+    _persistControls();
+  }
+
+  void _resumeAfterForeground() {
+    if (mounted && _txSilencedByLifecycle) {
+      setState(() => _txSilencedByLifecycle = false);
+    }
+    _reconnectAfterResume();
   }
 
   Future<void> _reconnectAfterResume() async {
@@ -437,10 +477,11 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   void _startConnectProbe() {
+    if (_txSilencedByLifecycle) return;
     _connectProbeTimer?.cancel();
     _sendTestUdp();
     _connectProbeTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (_connected) {
+      if (_txSilencedByLifecycle || _connected) {
         _connectProbeTimer?.cancel();
         _connectProbeTimer = null;
         return;
@@ -588,8 +629,9 @@ class _ControlScreenState extends State<ControlScreen>
     return steer;
   }
 
-  void _sendState() {
+  void _sendState({bool force = false}) {
     if (kIsWeb) return;
+    if (_txSilencedByLifecycle && !force) return;
     final enforcedSteer = _computeSteerWithHoldLimit();
     if (_steer != enforcedSteer) {
       _steer = enforcedSteer;
@@ -676,7 +718,7 @@ class _ControlScreenState extends State<ControlScreen>
   }
 
   void _sendTestUdp() {
-    if (kIsWeb) return;
+    if (kIsWeb || _txSilencedByLifecycle) return;
     final payload = _controlPayload(includePing: true);
     _udp.sendTo(InternetAddress('192.168.4.1'), payload);
     _udp.sendTo(InternetAddress('192.168.4.255'), payload);
